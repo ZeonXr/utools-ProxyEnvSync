@@ -1,7 +1,14 @@
 <script setup lang="ts">
-const chromeVersion = window.versions.chrome()
-const electronVersion = window.versions.electron()
-const nodeVersion = window.versions.node()
+const chromeVersion = window.customApis.chrome()
+const electronVersion = window.customApis.electron()
+const nodeVersion = window.customApis.node()
+// const test = window.customApis.checkProxy
+
+async function testProxy() {
+  const proxy = await window.customApis.getProxy()
+  debugger
+  console.log('proxy', proxy)
+}
 </script>
 
 <template>
@@ -14,7 +21,8 @@ const nodeVersion = window.versions.node()
     </a>
   </div>
   <h1>Hello World</h1>
-  <h1>Utools Vue3 插件模板</h1>
+  <h1>Utools Vue3 插件模板xx</h1>
+  <button @click="testProxy">test</button>
   <p>当前插件系统基于Electron(V{{ electronVersion }})，Chrome(V{{ chromeVersion }})，Node.js(V{{ nodeVersion }})</p>
 </template>
 

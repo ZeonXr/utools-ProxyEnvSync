@@ -12,13 +12,13 @@
     // 版本号
     version: "1.0.0",
     // 显示名称
-    pluginName: "template",
+    pluginName: "autoProxy",
     // 描述
-    description: "plugin template",
+    description: "autoProxy",
     // 作者
-    author: "QC2168",
+    author: "ZeonX",
     // 主页
-    homepage: "https://github.com/QC2168",
+    homepage: "https://github.com/ZeonXr",
     // 功能列表
     features: [
         {
