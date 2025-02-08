@@ -5,10 +5,13 @@ const nodeVersion = window.customApis.node()
 // const test = window.customApis.checkProxy
 
 async function testProxy() {
-  const proxy = await window.customApis.getProxy()
-  debugger
-  console.log('proxy', proxy)
+  console.log('proxy', 'proxy')
 }
+window.customApis.onProxyChanged((proxy) => {
+  console.log('proxy changed', proxy)
+  console.log('proxy changed', 'proxy');
+  
+})
 </script>
 
 <template>

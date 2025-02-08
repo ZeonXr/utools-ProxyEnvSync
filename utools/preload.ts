@@ -8,6 +8,7 @@
 //     electron: () => process.versions.electron
 // }
 
+import {ipcRenderer} from 'electron'
 import { exec } from 'child_process'
 import os from 'os'
 
@@ -80,19 +81,23 @@ function checkProxy() {
       console.log('代理已更改:', proxy)
       lastProxy = proxy
       utools.showNotification(`系统代理变更: ${proxy}`)
+      ipcRenderer.send('proxy-changed', proxy)
     }
   })
 }
 
 // 定时轮询（每 5 秒检测一次）
-setInterval(checkProxy, 5000)
+setInterval(checkProxy, 1000)
 checkProxy() // 立即执行一次
 
 export const customApis = {
   node: () => process.versions.node,
   chrome: () => process.versions.chrome,
   electron: () => process.versions.electron,
-  getProxy: () => lastProxy,
+  onProxyChanged: (callback: (proxy: string) => void) => {
+    console.log('监听代理变化');
+    ipcRenderer.on('proxy-changed', (_, proxy) => callback(proxy))
+  }
 }
 
 window.customApis = customApis
