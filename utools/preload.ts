@@ -1,4 +1,4 @@
-//https://www.u-tools.cn/docs/developer/docs.html
+// https://www.u-tools.cn/docs/developer/docs.html
 
 export const customApis = {
 

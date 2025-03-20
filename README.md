@@ -2,8 +2,6 @@
 
 基于`Vite+Vue`的`Utools`插件开发模板，让您更快的开发出一款属于自己的`Utools`插件
 
-
-
 **中文文档** | [English](https://github.com/QC2168/utools-plugin-template/blob/main/README-en_US.md)
 
 ## ✨ 特性
@@ -49,10 +47,9 @@ pnpm build
 > 原理：通过读取提供的`preload.js`文件，获取所需的依赖包后，在插件打包目录下执行`npm install`实现依赖安装
 
 ```js
-import { install } from '@qc2168/vite-plugin-utools';
+import { install } from '@qc2168/vite-plugin-utools'
 // 添加编译后的preload文件
-install(['./dist/preload.js']);
-
+install(['./dist/preload.js'])
 ```
 
 ### 如何启动插件

@@ -1,27 +1,34 @@
 {
   "name": "utools-plugin-template",
   "type": "module",
-  "private": true,
   "version": "0.0.0",
-  "author": "QC2168",
+  "private": true,
   "description": "Easily create utools plugins",
+  "author": "QC2168",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc && vite build && node ./scripts/build.js",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "eslint",
+    "lint:fix": "eslint --fix"
   },
   "dependencies": {
-    "@qc2168/vite-plugin-utools": "^1.6.0",
+    "@qc2168/vite-plugin-utools": "^1.7.0",
     "vue": "^3.5.13"
   },
   "devDependencies": {
-    "@types/node": "^20.17.9",
-    "@vitejs/plugin-vue": "^5.2.1",
+    "@antfu/eslint-config": "^4.10.1",
+    "@types/node": "^20.17.24",
+    "@unocss/eslint-plugin": "66.1.0-beta.6",
+    "@vitejs/plugin-vue": "^5.2.3",
     "electron": "^35.0.2",
-    "typescript": "^5.6.3",
+    "eslint": "^9.22.0",
+    "eslint-plugin-format": "^1.0.1",
+    "typescript": "^5.8.2",
+    "unocss": "66.1.0-beta.6",
     "utools-api-types": "^5.2.0",
-    "vite": "^6.0.3",
-    "vue-tsc": "^2.1.10"
+    "vite": "^6.2.2",
+    "vue-tsc": "^2.2.8"
   },
   "env": {
     "VITE_DEV_SERVER_HOST": "127.0.0.1",
