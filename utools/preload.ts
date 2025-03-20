@@ -13,6 +13,18 @@ export const customApis = {
     proxyManager.onSettingsChange(callback)
     return () => proxyManager.removeSettingsChangeListener(callback)
   },
+  getEnvStatus: () => proxyManager.getEnvStatus(),
+  setSyncEnabled: async (enabled: boolean) => {
+    await proxyManager.setSyncEnabled(enabled)
+  },
+  getSyncEnabled: () => proxyManager.getSyncEnabled(),
+  stopMonitoring: () => proxyManager.stopMonitoring(),
+}
+
+declare global {
+  interface Window {
+    customApis: typeof customApis
+  }
 }
 
 window.customApis = customApis

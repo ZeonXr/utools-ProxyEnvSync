@@ -7,6 +7,11 @@ const execAsync = promisify(exec)
 
 // 检查系统代理状态的刷新频率（毫秒）
 const PROXY_CHECK_INTERVAL = 5000
+const STORAGE_KEY = 'autoProxy.syncEnabled'
+
+// 配置文件中的标记
+const PROXY_CONFIG_BEGIN = '# BEGIN: AutoProxy Configuration'
+const PROXY_CONFIG_END = '# END: AutoProxy Configuration'
 
 export interface ProxySettings {
   enabled: boolean
@@ -23,9 +28,12 @@ class ProxyManager {
   private platform: string
   private networkInterface: string | null = null
   private settingsChangeListeners: SettingsChangeCallback[] = []
+  private syncEnabled: boolean
 
   private constructor() {
     this.platform = os.platform()
+    // 从存储中读取同步设置，默认为 true
+    this.syncEnabled = utools.dbStorage.getItem(STORAGE_KEY) ?? true
   }
 
   public static getInstance(): ProxyManager {
@@ -130,9 +138,13 @@ class ProxyManager {
       console.log('当前系统代理设置:', settings)
 
       if (JSON.stringify(settings) !== JSON.stringify(this.currentSettings)) {
-        console.log('代理设置发生变化，更新环境变量')
+        console.log('代理设置发生变化')
         this.currentSettings = settings
-        await this.updateEnvironmentVariables(settings)
+        // 只在启用同步时更新环境变量
+        if (this.syncEnabled) {
+          console.log('更新环境变量')
+          await this.updateEnvironmentVariables(settings)
+        }
         // 通知监听器
         this.notifySettingsChange(settings)
       }
@@ -285,15 +297,15 @@ class ProxyManager {
 
       if (settings.enabled && settings.host && settings.port) {
         const proxyUrl = `http://${settings.host}:${settings.port}`
-        const proxyConfig = `
-# AutoProxy Configuration
+        const proxyConfig = `${PROXY_CONFIG_BEGIN}
 export http_proxy="${proxyUrl}"
 export https_proxy="${proxyUrl}"
 export all_proxy="${proxyUrl}"
 export HTTP_PROXY="${proxyUrl}"
 export HTTPS_PROXY="${proxyUrl}"
 export ALL_PROXY="${proxyUrl}"
-`
+${PROXY_CONFIG_END}`
+
         console.log('准备更新代理配置:', {
           configPath,
           proxyUrl,
@@ -303,11 +315,11 @@ export ALL_PROXY="${proxyUrl}"
         try {
           let command: string
           if (this.platform === 'win32') {
-            command = `findstr /c:"AutoProxy Configuration" "${configPath}"`
+            command = `findstr /c:"${PROXY_CONFIG_BEGIN}" "${configPath}"`
           }
           else {
             // 使用 cat 和 grep 组合来避免权限问题
-            command = `cat "${configPath}" | grep -c "AutoProxy Configuration"`
+            command = `cat "${configPath}" | grep -c "${PROXY_CONFIG_BEGIN}"`
           }
           const { stdout } = await execAsync(command)
           const count = this.platform === 'win32' ? stdout.split('\n').length : Number.parseInt(stdout)
@@ -327,21 +339,30 @@ export ALL_PROXY="${proxyUrl}"
             console.log('更新现有代理配置')
             // 删除旧的配置
             if (this.platform === 'win32') {
-              // Windows 下使用 PowerShell 删除配置
-              await execAsync(`powershell -Command "(Get-Content '${configPath}' | Select-String -Pattern '# AutoProxy Configuration' -Context 0,6 -NotMatch) | Set-Content '${configPath}'"`)
+              // Windows 下使用 PowerShell 删除配置并保留注释标记
+              await execAsync(`powershell -Command "$content = Get-Content '${configPath}'; $start = $content | Select-String -Pattern '${PROXY_CONFIG_BEGIN}' | Select-Object -First 1 -ExpandProperty LineNumber; $end = $content | Select-String -Pattern '${PROXY_CONFIG_END}' | Select-Object -First 1 -ExpandProperty LineNumber; if ($start -and $end) { $content[0..($start-2)] + '${PROXY_CONFIG_BEGIN}' + '${PROXY_CONFIG_END}' + $content[$end..($content.Length-1)] | Set-Content '${configPath}' }"`)
             }
             else {
-              // 使用临时文件来避免权限问题
+              // 使用 sed 删除配置并保留注释标记
               const tempFile = `${configPath}.tmp`
-              await execAsync(`sed '/# AutoProxy Configuration/,/export ALL_PROXY=/d' "${configPath}" > "${tempFile}"`)
+              await execAsync(`sed '/${PROXY_CONFIG_BEGIN}/,/${PROXY_CONFIG_END}/c\\
+${PROXY_CONFIG_BEGIN}\\
+${PROXY_CONFIG_END}
+' "${configPath}" > "${tempFile}"`)
               await execAsync(`mv "${tempFile}" "${configPath}"`)
             }
             // 添加新的配置
             if (this.platform === 'win32') {
-              await execAsync(`echo ${proxyConfig} >> "${configPath}"`)
+              await execAsync(`powershell -Command "$content = Get-Content '${configPath}'; $start = $content | Select-String -Pattern '${PROXY_CONFIG_BEGIN}' | Select-Object -First 1 -ExpandProperty LineNumber; if ($start) { $content[0..($start-1)] + @('${PROXY_CONFIG_BEGIN}', 'export http_proxy=\\"${proxyUrl}\\"', 'export https_proxy=\\"${proxyUrl}\\"', 'export all_proxy=\\"${proxyUrl}\\"', 'export HTTP_PROXY=\\"${proxyUrl}\\"', 'export HTTPS_PROXY=\\"${proxyUrl}\\"', 'export ALL_PROXY=\\"${proxyUrl}\\"', '${PROXY_CONFIG_END}') + $content[($start+1)..($content.Length-1)] | Set-Content '${configPath}' }"`)
             }
             else {
-              await execAsync(`echo '${proxyConfig}' | tee -a "${configPath}"`)
+              await execAsync(`sed -i '' '/${PROXY_CONFIG_BEGIN}/a\\
+export http_proxy="${proxyUrl}"\\
+export https_proxy="${proxyUrl}"\\
+export all_proxy="${proxyUrl}"\\
+export HTTP_PROXY="${proxyUrl}"\\
+export HTTPS_PROXY="${proxyUrl}"\\
+export ALL_PROXY="${proxyUrl}"' "${configPath}"`)
             }
           }
         }
@@ -358,16 +379,19 @@ export ALL_PROXY="${proxyUrl}"
       }
       else {
         console.log('删除代理配置')
-        // 删除代理配置
+        // 删除代理配置但保留注释标记
         try {
           if (this.platform === 'win32') {
-            // Windows 下使用 PowerShell 删除配置
-            await execAsync(`powershell -Command "(Get-Content '${configPath}' | Select-String -Pattern '# AutoProxy Configuration' -Context 0,6 -NotMatch) | Set-Content '${configPath}'"`)
+            // Windows 下使用 PowerShell 删除配置并保留注释标记
+            await execAsync(`powershell -Command "$content = Get-Content '${configPath}'; $start = $content | Select-String -Pattern '${PROXY_CONFIG_BEGIN}' | Select-Object -First 1 -ExpandProperty LineNumber; $end = $content | Select-String -Pattern '${PROXY_CONFIG_END}' | Select-Object -First 1 -ExpandProperty LineNumber; if ($start -and $end) { $content[0..($start-2)] + '${PROXY_CONFIG_BEGIN}' + '${PROXY_CONFIG_END}' + $content[$end..($content.Length-1)] | Set-Content '${configPath}' }"`)
           }
           else {
-            // 使用临时文件来避免权限问题
+            // 使用 sed 删除配置并保留注释标记
             const tempFile = `${configPath}.tmp`
-            await execAsync(`sed '/# AutoProxy Configuration/,/export ALL_PROXY=/d' "${configPath}" > "${tempFile}"`)
+            await execAsync(`sed '/${PROXY_CONFIG_BEGIN}/,/${PROXY_CONFIG_END}/c\\
+${PROXY_CONFIG_BEGIN}\\
+${PROXY_CONFIG_END}
+' "${configPath}" > "${tempFile}"`)
             await execAsync(`mv "${tempFile}" "${configPath}"`)
           }
         }
@@ -382,7 +406,66 @@ export ALL_PROXY="${proxyUrl}"
   }
 
   public getCurrentSettings(): ProxySettings {
-    return { ...this.currentSettings }
+    return this.currentSettings
+  }
+
+  public async getEnvStatus(): Promise<{ enabled: boolean, proxyUrl?: string }> {
+    try {
+      const homeDir = process.env.HOME || process.env.USERPROFILE
+      if (!homeDir) {
+        return { enabled: false }
+      }
+
+      const shellConfigFile = this.platform === 'win32'
+        ? '.bash_profile'
+        : process.env.SHELL?.includes('zsh')
+          ? '.zshrc'
+          : '.bash_profile'
+
+      const configPath = this.platform === 'win32'
+        ? `${homeDir}\\${shellConfigFile}`
+        : `${homeDir}/${shellConfigFile}`
+
+      try {
+        const { stdout } = await execAsync(`cat "${configPath}" | grep "export http_proxy"`)
+        if (stdout) {
+          const match = stdout.match(/export http_proxy="(.+)"/)
+          return {
+            enabled: true,
+            proxyUrl: match?.[1],
+          }
+        }
+      }
+      catch {
+        // 如果没有找到配置，返回未启用状态
+        return { enabled: false }
+      }
+
+      return { enabled: false }
+    }
+    catch (error) {
+      console.error('获取环境变量状态失败:', error)
+      return { enabled: false }
+    }
+  }
+
+  public async setSyncEnabled(enabled: boolean): Promise<void> {
+    this.syncEnabled = enabled
+    // 保存设置到存储
+    utools.dbStorage.setItem(STORAGE_KEY, enabled)
+
+    // 如果关闭同步，清空环境变量
+    if (!enabled) {
+      await this.updateEnvironmentVariables({ enabled: false })
+    }
+    // 如果开启同步，立即同步当前状态
+    else if (this.currentSettings.enabled) {
+      await this.updateEnvironmentVariables(this.currentSettings)
+    }
+  }
+
+  public getSyncEnabled(): boolean {
+    return this.syncEnabled
   }
 }
 
