@@ -5,6 +5,9 @@ import { promisify } from 'node:util'
 
 const execAsync = promisify(exec)
 
+// 检查系统代理状态的刷新频率（毫秒）
+const PROXY_CHECK_INTERVAL = 5000
+
 export interface ProxySettings {
   enabled: boolean
   host?: string
@@ -44,6 +47,14 @@ class ProxyManager {
 
   private notifySettingsChange(settings: ProxySettings): void {
     this.settingsChangeListeners.forEach(callback => callback(settings))
+
+    // 发送 uTools 通知
+    if (settings.enabled) {
+      utools.showNotification(`系统代理已启用: ${settings.host}:${settings.port}`)
+    }
+    else {
+      utools.showNotification('系统代理已禁用')
+    }
   }
 
   public async startMonitoring(): Promise<void> {
@@ -62,7 +73,7 @@ class ProxyManager {
     // 每30秒检查一次系统代理状态
     this.checkInterval = setInterval(async () => {
       await this.checkAndUpdateProxy()
-    }, 30000)
+    }, PROXY_CHECK_INTERVAL)
   }
 
   private async initializeNetworkInterface(): Promise<void> {
