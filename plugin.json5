@@ -1,6 +1,6 @@
 {
 	// 下列属性为插件必需属性，了解更多属性请往前 官方文档-完整配置篇
-	// https://www.u.tools/docs/developer/config.html
+	// https://www.u-tools.cn/docs/developer/information/plugin-json.html
     // 插件图标路径
     logo: "logo.png",
     // 预加载脚本
@@ -19,6 +19,8 @@
     author: "ZeonX",
     // 主页
     homepage: "https://github.com/ZeonXr",
+    // 允许后台运行
+    allowBackground: true,
     // 功能列表
     features: [
         {
