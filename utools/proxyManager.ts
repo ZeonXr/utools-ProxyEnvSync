@@ -5,9 +5,10 @@ import { promisify } from 'node:util'
 
 const execAsync = promisify(exec)
 
-// 检查系统代理状态的刷新频率（毫秒）
-const PROXY_CHECK_INTERVAL = 5000
+// 默认检查系统代理状态的刷新频率（毫秒）
+const DEFAULT_PROXY_CHECK_INTERVAL = 5000
 const STORAGE_KEY = 'autoProxy.syncEnabled'
+const CHECK_INTERVAL_KEY = 'autoProxy.checkInterval'
 
 // 配置文件中的标记
 const PROXY_CONFIG_BEGIN = '# BEGIN: AutoProxy Configuration'
@@ -56,11 +57,14 @@ class ProxyManager {
   private networkInterface: string | null = null
   private settingsChangeListeners: SettingsChangeCallback[] = []
   private syncEnabled: boolean
+  private checkIntervalMs: number
 
   private constructor() {
     this.platform = os.platform()
     // 从存储中读取同步设置，默认为 true
     this.syncEnabled = utools.dbStorage.getItem(STORAGE_KEY) ?? true
+    // 从存储中读取检查间隔，默认为 5000ms
+    this.checkIntervalMs = utools.dbStorage.getItem(CHECK_INTERVAL_KEY) ?? DEFAULT_PROXY_CHECK_INTERVAL
   }
 
   public static getInstance(): ProxyManager {
@@ -105,10 +109,10 @@ class ProxyManager {
     // 立即检查一次当前状态
     await this.checkAndUpdateProxy()
 
-    // 每30秒检查一次系统代理状态
+    // 使用配置的间隔时间检查系统代理状态
     this.checkInterval = setInterval(async () => {
       await this.checkAndUpdateProxy()
-    }, PROXY_CHECK_INTERVAL)
+    }, this.checkIntervalMs)
   }
 
   private async initializeNetworkInterface(): Promise<void> {
@@ -486,6 +490,28 @@ ${PROXY_CONFIG_END}
 
   public getSyncEnabled(): boolean {
     return this.syncEnabled
+  }
+
+  public async setCheckInterval(intervalMs: number): Promise<void> {
+    if (intervalMs < 1000) {
+      throw new Error('检查间隔不能小于1000毫秒')
+    }
+
+    this.checkIntervalMs = intervalMs
+    // 保存设置到存储
+    utools.dbStorage.setItem(CHECK_INTERVAL_KEY, intervalMs)
+
+    // 如果正在监控，重新设置定时器
+    if (this.checkInterval) {
+      clearInterval(this.checkInterval)
+      this.checkInterval = setInterval(async () => {
+        await this.checkAndUpdateProxy()
+      }, intervalMs)
+    }
+  }
+
+  public getCheckInterval(): number {
+    return this.checkIntervalMs
   }
 }
 

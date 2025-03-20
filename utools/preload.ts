@@ -1,5 +1,4 @@
 // https://www.u-tools.cn/docs/developer/docs.html
-import type { ProxySettings } from './proxyManager'
 import ProxyManager from './proxyManager'
 
 const proxyManager = ProxyManager.getInstance()
@@ -7,18 +6,31 @@ const proxyManager = ProxyManager.getInstance()
 // 启动代理监控
 proxyManager.startMonitoring()
 
-export const customApis = {
+// 定义要暴露给渲染进程的 API
+const customApis = {
+  // 获取当前系统代理设置
   getCurrentSettings: () => proxyManager.getCurrentSettings(),
-  onSettingsChange: (callback: (settings: ProxySettings) => void) => {
+
+  // 获取环境变量状态
+  getEnvStatus: () => proxyManager.getEnvStatus(),
+
+  // 设置同步状态
+  setSyncEnabled: (enabled: boolean) => proxyManager.setSyncEnabled(enabled),
+
+  // 获取同步状态
+  getSyncEnabled: () => proxyManager.getSyncEnabled(),
+
+  // 设置检查间隔
+  setCheckInterval: (intervalMs: number) => proxyManager.setCheckInterval(intervalMs),
+
+  // 获取检查间隔
+  getCheckInterval: () => proxyManager.getCheckInterval(),
+
+  // 监听设置变化
+  onSettingsChange: (callback: (settings: any) => void) => {
     proxyManager.onSettingsChange(callback)
     return () => proxyManager.removeSettingsChangeListener(callback)
   },
-  getEnvStatus: () => proxyManager.getEnvStatus(),
-  setSyncEnabled: async (enabled: boolean) => {
-    await proxyManager.setSyncEnabled(enabled)
-  },
-  getSyncEnabled: () => proxyManager.getSyncEnabled(),
-  stopMonitoring: () => proxyManager.stopMonitoring(),
 }
 
 declare global {
