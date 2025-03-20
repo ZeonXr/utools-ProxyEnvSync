@@ -13,6 +13,33 @@ const STORAGE_KEY = 'autoProxy.syncEnabled'
 const PROXY_CONFIG_BEGIN = '# BEGIN: AutoProxy Configuration'
 const PROXY_CONFIG_END = '# END: AutoProxy Configuration'
 
+// 环境变量配置
+const ENV_HTTP_PROXY = 'export http_proxy'
+const ENV_HTTPS_PROXY = 'export https_proxy'
+const ENV_ALL_PROXY = 'export all_proxy'
+const ENV_HTTP_PROXY_UPPER = 'export HTTP_PROXY'
+const ENV_HTTPS_PROXY_UPPER = 'export HTTPS_PROXY'
+const ENV_ALL_PROXY_UPPER = 'export ALL_PROXY'
+
+// 生成代理配置数组
+function generateProxyConfigArray(proxyUrl: string): string[] {
+  return [
+    `${ENV_HTTP_PROXY}="${proxyUrl}"`,
+    `${ENV_HTTPS_PROXY}="${proxyUrl}"`,
+    `${ENV_ALL_PROXY}="${proxyUrl}"`,
+    `${ENV_HTTP_PROXY_UPPER}="${proxyUrl}"`,
+    `${ENV_HTTPS_PROXY_UPPER}="${proxyUrl}"`,
+    `${ENV_ALL_PROXY_UPPER}="${proxyUrl}"`,
+  ]
+}
+
+// 生成完整的代理配置
+function generateProxyConfig(proxyUrl: string): string {
+  return `${PROXY_CONFIG_BEGIN}
+${generateProxyConfigArray(proxyUrl).join('\n')}
+${PROXY_CONFIG_END}`
+}
+
 export interface ProxySettings {
   enabled: boolean
   host?: string
@@ -297,14 +324,7 @@ class ProxyManager {
 
       if (settings.enabled && settings.host && settings.port) {
         const proxyUrl = `http://${settings.host}:${settings.port}`
-        const proxyConfig = `${PROXY_CONFIG_BEGIN}
-export http_proxy="${proxyUrl}"
-export https_proxy="${proxyUrl}"
-export all_proxy="${proxyUrl}"
-export HTTP_PROXY="${proxyUrl}"
-export HTTPS_PROXY="${proxyUrl}"
-export ALL_PROXY="${proxyUrl}"
-${PROXY_CONFIG_END}`
+        const proxyConfig = generateProxyConfig(proxyUrl)
 
         console.log('准备更新代理配置:', {
           configPath,
@@ -353,16 +373,14 @@ ${PROXY_CONFIG_END}
             }
             // 添加新的配置
             if (this.platform === 'win32') {
-              await execAsync(`powershell -Command "$content = Get-Content '${configPath}'; $start = $content | Select-String -Pattern '${PROXY_CONFIG_BEGIN}' | Select-Object -First 1 -ExpandProperty LineNumber; if ($start) { $content[0..($start-1)] + @('${PROXY_CONFIG_BEGIN}', 'export http_proxy=\\"${proxyUrl}\\"', 'export https_proxy=\\"${proxyUrl}\\"', 'export all_proxy=\\"${proxyUrl}\\"', 'export HTTP_PROXY=\\"${proxyUrl}\\"', 'export HTTPS_PROXY=\\"${proxyUrl}\\"', 'export ALL_PROXY=\\"${proxyUrl}\\"', '${PROXY_CONFIG_END}') + $content[($start+1)..($content.Length-1)] | Set-Content '${configPath}' }"`)
+              const proxyConfigArray = generateProxyConfigArray(proxyUrl).map(line => line.replace(/"/g, '\\"'))
+              await execAsync(`powershell -Command "$content = Get-Content '${configPath}'; $start = $content | Select-String -Pattern '${PROXY_CONFIG_BEGIN}' | Select-Object -First 1 -ExpandProperty LineNumber; if ($start) { $content[0..($start-1)] + @('${PROXY_CONFIG_BEGIN}', '${proxyConfigArray.join('\', \'')}', '${PROXY_CONFIG_END}') + $content[($start+1)..($content.Length-1)] | Set-Content '${configPath}' }"`)
             }
             else {
-              await execAsync(`sed -i '' '/${PROXY_CONFIG_BEGIN}/a\\
-export http_proxy="${proxyUrl}"\\
-export https_proxy="${proxyUrl}"\\
-export all_proxy="${proxyUrl}"\\
-export HTTP_PROXY="${proxyUrl}"\\
-export HTTPS_PROXY="${proxyUrl}"\\
-export ALL_PROXY="${proxyUrl}"' "${configPath}"`)
+              await execAsync(`sed -i '' '/${PROXY_CONFIG_BEGIN}/,/${PROXY_CONFIG_END}/c\\
+${PROXY_CONFIG_BEGIN}\\
+${generateProxyConfigArray(proxyUrl).join('\\\n')}\\
+${PROXY_CONFIG_END}' "${configPath}"`)
             }
           }
         }
@@ -383,7 +401,9 @@ export ALL_PROXY="${proxyUrl}"' "${configPath}"`)
         try {
           if (this.platform === 'win32') {
             // Windows 下使用 PowerShell 删除配置并保留注释标记
-            await execAsync(`powershell -Command "$content = Get-Content '${configPath}'; $start = $content | Select-String -Pattern '${PROXY_CONFIG_BEGIN}' | Select-Object -First 1 -ExpandProperty LineNumber; $end = $content | Select-String -Pattern '${PROXY_CONFIG_END}' | Select-Object -First 1 -ExpandProperty LineNumber; if ($start -and $end) { $content[0..($start-2)] + '${PROXY_CONFIG_BEGIN}' + '${PROXY_CONFIG_END}' + $content[$end..($content.Length-1)] | Set-Content '${configPath}' }"`)
+            await execAsync(`powershell -Command "$content = Get-Content '${configPath}'; \\
+            $start = $content | Select-String -Pattern '${PROXY_CONFIG_BEGIN}' | Select-Object -First 1 -ExpandProperty LineNumber; \\
+            $end = $content | Select-String -Pattern '${PROXY_CONFIG_END}' | Select-Object -First 1 -ExpandProperty LineNumber; \\if ($start -and $end) { $content[0..($start-2)] + '${PROXY_CONFIG_BEGIN}' + '${PROXY_CONFIG_END}' + $content[$end..($content.Length-1)] | Set-Content '${configPath}' }"`)
           }
           else {
             // 使用 sed 删除配置并保留注释标记
