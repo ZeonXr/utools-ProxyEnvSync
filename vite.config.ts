@@ -1,3 +1,4 @@
+import path from 'node:path'
 import utools, { BuildMode } from '@qc2168/vite-plugin-utools'
 import vue from '@vitejs/plugin-vue'
 import UnoCSS from 'unocss/vite'
@@ -20,6 +21,9 @@ export default defineConfig(({ command }) => {
     server: {
       host: pkg.env.VITE_DEV_SERVER_HOST,
       port: pkg.env.VITE_DEV_SERVER_PORT,
+    },
+    alias: {
+      '@': path.resolve(__dirname, './'),
     },
   }
 })
