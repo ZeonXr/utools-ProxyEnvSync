@@ -226,15 +226,33 @@ class ProxyManager {
         }
 
         case 'win32': { // Windows
-          command = 'reg query "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings" /v ProxyEnable /v ProxyServer'
-          const { stdout: winStdout } = await execAsync(command)
-          const winLines = winStdout.split('\n')
-          enabled = winLines[0].includes('0x1')
-          const proxyServer = winLines[1].match(/ProxyServer\s+REG_SZ\s+(.+)/)?.[1]
-          if (proxyServer) {
-            const [proxyHost, proxyPort] = proxyServer.split(':')
-            host = proxyHost
-            port = Number.parseInt(proxyPort || '0')
+          try {
+            command = 'powershell -Command "Get-ItemProperty -Path \'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings\' | Select-Object ProxyEnable,ProxyServer | ConvertTo-Json"'
+            const { stdout: winStdout } = await execAsync(command)
+            const proxySettings = JSON.parse(winStdout)
+            enabled = proxySettings.ProxyEnable === 1
+            if (proxySettings.ProxyServer) {
+              const [proxyHost, proxyPort] = proxySettings.ProxyServer.split(':')
+              host = proxyHost
+              port = Number.parseInt(proxyPort || '0')
+            }
+          }
+          catch (error) {
+            console.error('获取 Windows 代理设置失败，尝试备用方法:', error)
+            // 备用方法：使用 reg query
+            command = 'reg query "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings" /v ProxyEnable /v ProxyServer'
+            const { stdout: winStdout } = await execAsync(command)
+            const winLines = winStdout.split('\n')
+            enabled = winLines.some(line => line.includes('ProxyEnable') && line.includes('0x1'))
+            const proxyServerLine = winLines.find(line => line.includes('ProxyServer'))
+            if (proxyServerLine) {
+              const proxyServer = proxyServerLine.match(/ProxyServer\s+REG_SZ\s+(.+)/)?.[1]
+              if (proxyServer) {
+                const [proxyHost, proxyPort] = proxyServer.split(':')
+                host = proxyHost
+                port = Number.parseInt(proxyPort || '0')
+              }
+            }
           }
           break
         }
@@ -339,20 +357,21 @@ class ProxyManager {
         try {
           let command: string
           if (this.platform === 'win32') {
-            command = `findstr /c:"${PROXY_CONFIG_BEGIN}" "${configPath}"`
+            command = `powershell -Command "if (Test-Path '${configPath}') { Select-String -Path '${configPath}' -Pattern '${PROXY_CONFIG_BEGIN}' -Quiet } else { $false }"`
           }
           else {
             // 使用 cat 和 grep 组合来避免权限问题
             command = `cat "${configPath}" | grep -c "${PROXY_CONFIG_BEGIN}"`
           }
           const { stdout } = await execAsync(command)
-          const count = this.platform === 'win32' ? stdout.split('\n').length : Number.parseInt(stdout)
+          const count = this.platform === 'win32' ? (stdout.trim() === 'True' ? 1 : 0) : Number.parseInt(stdout)
           console.log('现有配置数量:', count)
 
           if (count === 0) {
             console.log('添加新的代理配置')
             if (this.platform === 'win32') {
-              await execAsync(`echo ${proxyConfig} >> "${configPath}"`)
+              const proxyConfigArray = generateProxyConfigArray(proxyUrl).map(line => line.replace(/"/g, '`"'))
+              await execAsync(`powershell -Command "$content = Get-Content '${configPath}' -Encoding UTF8; $newContent = @(); $inProxySection = $false; foreach ($line in $content) { if ($line -eq '${PROXY_CONFIG_BEGIN}') { $newContent += $line; $newContent += '${proxyConfigArray.join('\', \'')}'; $inProxySection = $true } elseif ($line -eq '${PROXY_CONFIG_END}') { if ($inProxySection) { $newContent += $line; $inProxySection = $false } } elseif (-not $inProxySection) { $newContent += $line } }; if (-not ($newContent -contains '${PROXY_CONFIG_BEGIN}') -or -not ($newContent -contains '${PROXY_CONFIG_END}')) { $newContent = @('${PROXY_CONFIG_BEGIN}', '${proxyConfigArray.join('\', \'')}', '${PROXY_CONFIG_END}') }; $newContent | Set-Content '${configPath}' -Encoding UTF8"`)
             }
             else {
               // 使用 tee 命令来确保正确的文件权限
@@ -364,27 +383,17 @@ class ProxyManager {
             // 删除旧的配置
             if (this.platform === 'win32') {
               // Windows 下使用 PowerShell 删除配置并保留注释标记
-              await execAsync(`powershell -Command "$content = Get-Content '${configPath}'; $start = $content | Select-String -Pattern '${PROXY_CONFIG_BEGIN}' | Select-Object -First 1 -ExpandProperty LineNumber; $end = $content | Select-String -Pattern '${PROXY_CONFIG_END}' | Select-Object -First 1 -ExpandProperty LineNumber; if ($start -and $end) { $content[0..($start-2)] + '${PROXY_CONFIG_BEGIN}' + '${PROXY_CONFIG_END}' + $content[$end..($content.Length-1)] | Set-Content '${configPath}' }"`)
+              const proxyConfigArray = generateProxyConfigArray(proxyUrl).map(line => line.replace(/"/g, '`"'))
+              await execAsync(`powershell -Command "$content = Get-Content '${configPath}' -Encoding UTF8; $newContent = @(); $inProxySection = $false; foreach ($line in $content) { if ($line -eq '${PROXY_CONFIG_BEGIN}') { $newContent += $line; $newContent += '${proxyConfigArray.join('\', \'')}'; $inProxySection = $true } elseif ($line -eq '${PROXY_CONFIG_END}') { if ($inProxySection) { $newContent += $line; $inProxySection = $false } } elseif (-not $inProxySection) { $newContent += $line } }; if (-not ($newContent -contains '${PROXY_CONFIG_BEGIN}') -or -not ($newContent -contains '${PROXY_CONFIG_END}')) { $newContent = @('${PROXY_CONFIG_BEGIN}', '${proxyConfigArray.join('\', \'')}', '${PROXY_CONFIG_END}') }; $newContent | Set-Content '${configPath}' -Encoding UTF8"`)
             }
             else {
               // 使用 sed 删除配置并保留注释标记
               const tempFile = `${configPath}.tmp`
-              await execAsync(`sed '/${PROXY_CONFIG_BEGIN}/,/${PROXY_CONFIG_END}/c\\
-${PROXY_CONFIG_BEGIN}\\
-${PROXY_CONFIG_END}
-' "${configPath}" > "${tempFile}"`)
-              await execAsync(`mv "${tempFile}" "${configPath}"`)
-            }
-            // 添加新的配置
-            if (this.platform === 'win32') {
-              const proxyConfigArray = generateProxyConfigArray(proxyUrl).map(line => line.replace(/"/g, '\\"'))
-              await execAsync(`powershell -Command "$content = Get-Content '${configPath}'; $start = $content | Select-String -Pattern '${PROXY_CONFIG_BEGIN}' | Select-Object -First 1 -ExpandProperty LineNumber; if ($start) { $content[0..($start-1)] + @('${PROXY_CONFIG_BEGIN}', '${proxyConfigArray.join('\', \'')}', '${PROXY_CONFIG_END}') + $content[($start+1)..($content.Length-1)] | Set-Content '${configPath}' }"`)
-            }
-            else {
-              await execAsync(`sed -i '' '/${PROXY_CONFIG_BEGIN}/,/${PROXY_CONFIG_END}/c\\
+              await execAsync(`sed -e '/${PROXY_CONFIG_BEGIN}/,/${PROXY_CONFIG_END}/c\\
 ${PROXY_CONFIG_BEGIN}\\
 ${generateProxyConfigArray(proxyUrl).join('\\\n')}\\
-${PROXY_CONFIG_END}' "${configPath}"`)
+${PROXY_CONFIG_END}' "${configPath}" > "${tempFile}"`)
+              await execAsync(`mv "${tempFile}" "${configPath}"`)
             }
           }
         }
@@ -404,18 +413,15 @@ ${PROXY_CONFIG_END}' "${configPath}"`)
         // 删除代理配置但保留注释标记
         try {
           if (this.platform === 'win32') {
-            // Windows 下使用 PowerShell 删除配置并保留注释标记
-            await execAsync(`powershell -Command "$content = Get-Content '${configPath}'; \\
-            $start = $content | Select-String -Pattern '${PROXY_CONFIG_BEGIN}' | Select-Object -First 1 -ExpandProperty LineNumber; \\
-            $end = $content | Select-String -Pattern '${PROXY_CONFIG_END}' | Select-Object -First 1 -ExpandProperty LineNumber; \\if ($start -and $end) { $content[0..($start-2)] + '${PROXY_CONFIG_BEGIN}' + '${PROXY_CONFIG_END}' + $content[$end..($content.Length-1)] | Set-Content '${configPath}' }"`)
+            // Windows 下使用 PowerShell 删除所有配置并只保留一对标记
+            await execAsync(`powershell -Command "$content = Get-Content '${configPath}' -Encoding UTF8; $newContent = @(); $inProxySection = $false; foreach ($line in $content) { if ($line -eq '${PROXY_CONFIG_BEGIN}') { if (-not $inProxySection) { $newContent += $line; $inProxySection = $true } } elseif ($line -eq '${PROXY_CONFIG_END}') { if ($inProxySection) { $newContent += $line; $inProxySection = $false } } elseif (-not $inProxySection) { $newContent += $line } }; if (-not ($newContent -contains '${PROXY_CONFIG_BEGIN}') -or -not ($newContent -contains '${PROXY_CONFIG_END}')) { $newContent = @('${PROXY_CONFIG_BEGIN}', '${PROXY_CONFIG_END}') }; $newContent | Set-Content '${configPath}' -Encoding UTF8"`)
           }
           else {
-            // 使用 sed 删除配置并保留注释标记
+            // 使用 sed 删除所有配置并只保留一对标记
             const tempFile = `${configPath}.tmp`
-            await execAsync(`sed '/${PROXY_CONFIG_BEGIN}/,/${PROXY_CONFIG_END}/c\\
-${PROXY_CONFIG_BEGIN}\\
-${PROXY_CONFIG_END}
-' "${configPath}" > "${tempFile}"`)
+            await execAsync(`sed -e '/${PROXY_CONFIG_BEGIN}/,/${PROXY_CONFIG_END}/d' "${configPath}" > "${tempFile}"`)
+            await execAsync(`echo '${PROXY_CONFIG_BEGIN}' >> "${tempFile}"`)
+            await execAsync(`echo '${PROXY_CONFIG_END}' >> "${tempFile}"`)
             await execAsync(`mv "${tempFile}" "${configPath}"`)
           }
         }

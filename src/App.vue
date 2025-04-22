@@ -114,244 +114,102 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="container">
-    <div class="header">
-      <h1>AutoProxy</h1>
-      <div class="sync-switch">
-        <span>同步系统代理</span>
-        <label class="switch">
-          <input
-            type="checkbox"
-            :checked="syncEnabled"
-            @change="toggleSync(!syncEnabled)"
-          >
-          <span class="slider" />
-        </label>
-      </div>
-    </div>
-
-    <div class="settings">
-      <div class="form-item">
-        <label>检查间隔</label>
-        <div class="input-group">
-          <input
-            v-model="checkInterval"
-            type="number"
-            :min="1"
-            :max="60"
-            :disabled="!syncEnabled"
-            class="number-input"
-            @change="updateCheckInterval(checkInterval)"
-          >
-          <span class="unit">秒</span>
+  <div class="min-h-screen bg-gray-100 p-4">
+    <div class="max-w-6xl mx-auto">
+      <div class="flex flex-col gap-4">
+        <!-- 标题 -->
+        <div class="text-2xl font-bold text-gray-800">
+          系统代理设置
         </div>
-      </div>
-    </div>
 
-    <div class="status">
-      <div class="status-item">
-        <span class="label">系统代理状态：</span>
-        <span class="status-badge" :class="{ success: systemProxyEnabled }">
-          {{ systemProxyEnabled ? '已启用' : '未启用' }}
-        </span>
-      </div>
-      <div class="status-item">
-        <span class="label">环境变量状态：</span>
-        <span class="status-badge" :class="{ success: envStatus.enabled }">
-          {{ envStatus.enabled ? '已同步' : '未同步' }}
-        </span>
-      </div>
-    </div>
+        <!-- 双栏布局 -->
+        <div class="flex gap-4">
+          <!-- 左侧系统代理状态 -->
+          <div class="flex-1 bg-white rounded-lg shadow p-4">
+            <div class="text-lg font-semibold mb-4">
+              系统代理状态
+            </div>
+            <div class="space-y-4">
+              <div class="flex items-center justify-between">
+                <span class="text-gray-700">代理状态</span>
+                <span :class="proxyStatus.enabled ? 'text-green-500' : 'text-red-500'">
+                  {{ proxyStatus.enabled ? '已启用' : '已禁用' }}
+                </span>
+              </div>
+              <div v-if="proxyStatus.enabled" class="space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="text-gray-700">代理服务器</span>
+                  <span class="text-gray-900">{{ proxyStatus.host }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-gray-700">代理端口</span>
+                  <span class="text-gray-900">{{ proxyStatus.port }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
 
-    <div v-if="systemProxyEnabled" class="proxy-info">
-      <div class="info-item">
-        <span class="label">代理服务器：</span>
-        <span class="value">{{ systemProxyHost }}</span>
-      </div>
-      <div class="info-item">
-        <span class="label">代理端口：</span>
-        <span class="value">{{ systemProxyPort }}</span>
+          <!-- 右侧环境变量状态 -->
+          <div class="flex-1 bg-white rounded-lg shadow p-4">
+            <div class="text-lg font-semibold mb-4">
+              环境变量状态
+            </div>
+            <div class="space-y-4">
+              <div class="flex items-center justify-between">
+                <span class="text-gray-700">同步状态</span>
+                <div class="flex items-center gap-2">
+                  <span :class="syncEnabled ? 'text-green-500' : 'text-red-500'">
+                    {{ syncEnabled ? '已开启' : '已关闭' }}
+                  </span>
+                  <button
+                    class="px-3 py-1 rounded text-sm"
+                    :class="syncEnabled ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-green-100 text-green-600 hover:bg-green-200'"
+                    @click="toggleSync(!syncEnabled)"
+                  >
+                    {{ syncEnabled ? '关闭同步' : '开启同步' }}
+                  </button>
+                </div>
+              </div>
+              <div v-if="envStatus.enabled" class="space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="text-gray-700">HTTP_PROXY</span>
+                  <span class="text-gray-900">{{ envStatus.proxyUrl }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-gray-700">HTTPS_PROXY</span>
+                  <span class="text-gray-900">{{ envStatus.proxyUrl }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-gray-700">ALL_PROXY</span>
+                  <span class="text-gray-900">{{ envStatus.proxyUrl }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 检查间隔设置 -->
+        <div class="bg-white rounded-lg shadow p-4">
+          <div class="text-lg font-semibold mb-4">
+            检查间隔设置
+          </div>
+          <div class="flex items-center gap-4">
+            <input
+              v-model="checkInterval"
+              type="number"
+              min="1"
+              max="60"
+              class="w-20 px-3 py-2 border rounded"
+              @change="updateCheckInterval(checkInterval)"
+            >
+            <span class="text-gray-700">秒</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
-<style scoped>
-.container {
-  padding: 20px;
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.sync-switch {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-/* 开关样式 */
-.switch {
-  position: relative;
-  display: inline-block;
-  width: 50px;
-  height: 24px;
-}
-
-.switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: #ccc;
-  transition: 0.4s;
-  border-radius: 24px;
-}
-
-.slider:before {
-  position: absolute;
-  content: '';
-  height: 16px;
-  width: 16px;
-  left: 4px;
-  bottom: 4px;
-  background-color: white;
-  transition: 0.4s;
-  border-radius: 50%;
-}
-
-input:checked + .slider {
-  background-color: #4caf50;
-}
-
-input:checked + .slider:before {
-  transform: translateX(26px);
-}
-
-.settings {
-  margin-bottom: 20px;
-}
-
-.form-item {
-  display: flex;
-  align-items: center;
-  margin-bottom: 15px;
-}
-
-.form-item label {
-  width: 120px;
-  color: #666;
-}
-
-.input-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.number-input {
-  width: 80px;
-  padding: 4px 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-}
-
-.number-input:disabled {
-  background-color: #f5f5f5;
-  cursor: not-allowed;
-}
-
-.unit {
-  color: #666;
-}
-
-.status {
-  margin-bottom: 20px;
-}
-
-.status-item {
-  margin-bottom: 10px;
-}
-
-.label {
-  color: #666;
-  margin-right: 10px;
-}
-
-.status-badge {
-  display: inline-block;
-  padding: 4px 8px;
-  border-radius: 4px;
-  background-color: #f5f5f5;
-  color: #666;
-}
-
-.status-badge.success {
-  background-color: #e8f5e9;
-  color: #4caf50;
-}
-
-.proxy-info {
-  background-color: #f5f7fa;
-  padding: 15px;
-  border-radius: 4px;
-}
-
-.info-item {
-  margin-bottom: 8px;
-}
-
-.info-item:last-child {
-  margin-bottom: 0;
-}
-
-.value {
-  color: #2196f3;
-  font-weight: 500;
-}
-
-/* 消息提示样式 */
-.message {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  padding: 10px 20px;
-  border-radius: 4px;
-  color: white;
-  z-index: 1000;
-  animation: slideIn 0.3s ease-out;
-}
-
-.message.success {
-  background-color: #4caf50;
-}
-
-.message.error {
-  background-color: #f44336;
-}
-
-@keyframes slideIn {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
+<style>
+/* 删除所有样式，因为已经使用 UnoCSS 替换 */
 </style>
