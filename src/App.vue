@@ -114,8 +114,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-100 p-4">
-    <div class="max-w-6xl mx-auto">
+  <div class="p-4">
+    <div class="mx-auto">
       <div class="flex flex-col gap-4">
         <!-- 标题 -->
         <div class="text-2xl font-bold text-gray-800">
