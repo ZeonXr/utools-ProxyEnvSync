@@ -2,8 +2,10 @@
 import type { ProxySettings } from '@/utools/proxyManager'
 import { useDark, useToggle } from '@vueuse/core'
 import { onMounted, onUnmounted, ref } from 'vue'
+import Card from './components/Card.vue'
 import EnvStatus from './components/EnvStatus.vue'
 import SystemProxyStatus from './components/SystemProxyStatus.vue'
+import { useToast } from './composables/useToast'
 
 const proxyStatus = ref<ProxySettings>({ enabled: false })
 const envStatus = ref<{ enabled: boolean, proxyUrl?: string }>({ enabled: false })
@@ -19,6 +21,9 @@ let settingsChangeUnsubscribe: (() => void) | null = null
 // 使用 VueUse 的暗黑模式功能
 const isDark = useDark()
 const toggleDark = useToggle(isDark)
+
+// 使用 Toast
+const { showMessage, cleanup } = useToast()
 
 function updateStatus(settings: ProxySettings) {
   proxyStatus.value = settings
@@ -74,18 +79,6 @@ async function updateCheckInterval(value: number) {
   }
 }
 
-// 显示消息
-function showMessage(message: string, type: 'success' | 'error' = 'success') {
-  const messageEl = document.createElement('div')
-  messageEl.className = `message ${type}`
-  messageEl.textContent = message
-  document.body.appendChild(messageEl)
-
-  setTimeout(() => {
-    messageEl.remove()
-  }, 3000)
-}
-
 // 监听设置变化
 function handleSettingsChange(settings: ProxySettings) {
   systemProxyEnabled.value = settings.enabled
@@ -129,6 +122,8 @@ onUnmounted(() => {
   if (settingsChangeUnsubscribe) {
     settingsChangeUnsubscribe()
   }
+  // 清理 Toast
+  cleanup()
 })
 </script>
 
@@ -151,10 +146,7 @@ onUnmounted(() => {
         </div>
 
         <!-- 通知状态设置 -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-          <div class="text-lg font-semibold mb-4 text-gray-800 dark:text-gray-100">
-            通知设置
-          </div>
+        <Card title="通知设置">
           <div class="flex items-center justify-between">
             <span class="text-gray-700 dark:text-gray-300">通知状态</span>
             <div class="flex items-center gap-2">
@@ -170,13 +162,10 @@ onUnmounted(() => {
               </button>
             </div>
           </div>
-        </div>
+        </Card>
 
         <!-- 同步状态设置 -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-          <div class="text-lg font-semibold mb-4 text-gray-800 dark:text-gray-100">
-            同步设置
-          </div>
+        <Card title="同步设置">
           <div class="flex items-center justify-between">
             <span class="text-gray-700 dark:text-gray-300">同步状态</span>
             <div class="flex items-center gap-2">
@@ -192,7 +181,7 @@ onUnmounted(() => {
               </button>
             </div>
           </div>
-        </div>
+        </Card>
 
         <!-- 双栏布局 -->
         <div class="flex gap-4">
@@ -204,10 +193,7 @@ onUnmounted(() => {
         </div>
 
         <!-- 检查间隔设置 -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-          <div class="text-lg font-semibold mb-4 text-gray-800 dark:text-gray-100">
-            检查间隔设置
-          </div>
+        <Card title="检查间隔设置">
           <div class="flex items-center gap-4">
             <input
               v-model="checkInterval"
@@ -219,7 +205,7 @@ onUnmounted(() => {
             >
             <span class="text-gray-700 dark:text-gray-300">秒</span>
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   </div>
