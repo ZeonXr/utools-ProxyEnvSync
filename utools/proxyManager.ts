@@ -9,6 +9,7 @@ const execAsync = promisify(exec)
 const DEFAULT_PROXY_CHECK_INTERVAL = 5000
 const STORAGE_KEY = 'autoProxy.syncEnabled'
 const CHECK_INTERVAL_KEY = 'autoProxy.checkInterval'
+const NOTIFICATION_ENABLED_KEY = 'autoProxy.notificationEnabled'
 
 // 配置文件中的标记
 const PROXY_CONFIG_BEGIN = '# BEGIN: AutoProxy Configuration'
@@ -58,6 +59,7 @@ class ProxyManager {
   private settingsChangeListeners: SettingsChangeCallback[] = []
   private syncEnabled: boolean
   private checkIntervalMs: number
+  private notificationEnabled: boolean
 
   private constructor() {
     this.platform = os.platform()
@@ -65,6 +67,8 @@ class ProxyManager {
     this.syncEnabled = utools.dbStorage.getItem(STORAGE_KEY) ?? true
     // 从存储中读取检查间隔，默认为 5000ms
     this.checkIntervalMs = utools.dbStorage.getItem(CHECK_INTERVAL_KEY) ?? DEFAULT_PROXY_CHECK_INTERVAL
+    // 从存储中读取通知设置，默认为 true
+    this.notificationEnabled = utools.dbStorage.getItem(NOTIFICATION_ENABLED_KEY) ?? true
   }
 
   public static getInstance(): ProxyManager {
@@ -87,12 +91,14 @@ class ProxyManager {
   private notifySettingsChange(settings: ProxySettings): void {
     this.settingsChangeListeners.forEach(callback => callback(settings))
 
-    // 发送 uTools 通知
-    if (settings.enabled) {
-      utools.showNotification(`系统代理已启用: ${settings.host}:${settings.port}`)
-    }
-    else {
-      utools.showNotification('系统代理已禁用')
+    // 只在启用通知时发送 uTools 通知
+    if (this.notificationEnabled) {
+      if (settings.enabled) {
+        utools.showNotification(`系统代理已启用: ${settings.host}:${settings.port}`)
+      }
+      else {
+        utools.showNotification('系统代理已禁用')
+      }
     }
   }
 
@@ -518,6 +524,16 @@ ${PROXY_CONFIG_END}' "${configPath}" > "${tempFile}"`)
 
   public getCheckInterval(): number {
     return this.checkIntervalMs
+  }
+
+  public async setNotificationEnabled(enabled: boolean): Promise<void> {
+    this.notificationEnabled = enabled
+    // 保存设置到存储
+    utools.dbStorage.setItem(NOTIFICATION_ENABLED_KEY, enabled)
+  }
+
+  public getNotificationEnabled(): boolean {
+    return this.notificationEnabled
   }
 }
 

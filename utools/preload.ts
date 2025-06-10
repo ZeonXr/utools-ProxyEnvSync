@@ -26,6 +26,12 @@ const customApis = {
   // 获取检查间隔
   getCheckInterval: () => proxyManager.getCheckInterval(),
 
+  // 设置通知状态
+  setNotificationEnabled: (enabled: boolean) => proxyManager.setNotificationEnabled(enabled),
+
+  // 获取通知状态
+  getNotificationEnabled: () => proxyManager.getNotificationEnabled(),
+
   // 监听设置变化
   onSettingsChange: (callback: (settings: any) => void) => {
     proxyManager.onSettingsChange(callback)

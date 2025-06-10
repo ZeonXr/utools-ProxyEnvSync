@@ -10,6 +10,7 @@ interface EnvStatus {
 const proxyStatus = ref<ProxySettings>({ enabled: false })
 const envStatus = ref<EnvStatus>({ enabled: false })
 const syncEnabled = ref(false)
+const notificationEnabled = ref(false)
 const systemProxyEnabled = ref(false)
 const systemProxyHost = ref('')
 const systemProxyPort = ref('')
@@ -39,6 +40,21 @@ async function toggleSync(enabled: boolean) {
     showMessage('设置同步状态失败', 'error')
     // 恢复开关状态
     syncEnabled.value = !enabled
+  }
+}
+
+// 切换通知状态
+async function toggleNotification(enabled: boolean) {
+  try {
+    await window.customApis.setNotificationEnabled(enabled)
+    notificationEnabled.value = enabled
+    showMessage(enabled ? '已开启通知' : '已关闭通知')
+  }
+  catch (error) {
+    console.error('设置通知状态失败:', error)
+    showMessage('设置通知状态失败', 'error')
+    // 恢复开关状态
+    notificationEnabled.value = !enabled
   }
 }
 
@@ -85,6 +101,7 @@ async function getCurrentSettings() {
     systemProxyPort.value = String(settings.port) || ''
     envStatus.value = await window.customApis.getEnvStatus()
     syncEnabled.value = await window.customApis.getSyncEnabled()
+    notificationEnabled.value = await window.customApis.getNotificationEnabled()
     checkInterval.value = await window.customApis.getCheckInterval() / 1000
   }
   catch (error) {
@@ -144,6 +161,21 @@ onUnmounted(() => {
                 <div class="flex items-center justify-between">
                   <span class="text-gray-700">代理端口</span>
                   <span class="text-gray-900">{{ proxyStatus.port }}</span>
+                </div>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-gray-700">通知状态</span>
+                <div class="flex items-center gap-2">
+                  <span :class="notificationEnabled ? 'text-green-500' : 'text-red-500'">
+                    {{ notificationEnabled ? '已开启' : '已关闭' }}
+                  </span>
+                  <button
+                    class="px-3 py-1 rounded text-sm"
+                    :class="notificationEnabled ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-green-100 text-green-600 hover:bg-green-200'"
+                    @click="toggleNotification(!notificationEnabled)"
+                  >
+                    {{ notificationEnabled ? '关闭通知' : '开启通知' }}
+                  </button>
                 </div>
               </div>
             </div>
