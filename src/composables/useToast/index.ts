@@ -1,4 +1,4 @@
-import { createVNode, ref, render } from 'vue'
+import { createVNode, onUnmounted, ref, render } from 'vue'
 import Toast from './Toast.vue'
 
 export function useToast() {
@@ -42,17 +42,16 @@ export function useToast() {
     }, 3000)
   }
 
-  // 清理函数
-  const cleanup = () => {
+  // 在组件卸载时自动清理
+  onUnmounted(() => {
     if (timer) {
       clearTimeout(timer)
     }
     render(null, container)
     document.body.removeChild(container)
-  }
+  })
 
   return {
     showMessage: updateToast,
-    cleanup,
   }
 }

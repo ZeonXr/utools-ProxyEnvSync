@@ -12,7 +12,7 @@ defineProps<{
 </script>
 
 <template>
-  <Card title="环境变量状态" class="flex-1">
+  <Card title="环境变量状态">
     <div class="space-y-4">
       <div class="flex items-center justify-between line-height-6">
         <span class="text-gray-700 dark:text-gray-300">HTTP_PROXY</span>
