@@ -1,14 +1,12 @@
 <script setup lang="ts">
 import type { ProxySettings } from '@/utools/proxyManager'
+import { useDark, useToggle } from '@vueuse/core'
 import { onMounted, onUnmounted, ref } from 'vue'
-
-interface EnvStatus {
-  enabled: boolean
-  proxyUrl?: string
-}
+import EnvStatus from './components/EnvStatus.vue'
+import SystemProxyStatus from './components/SystemProxyStatus.vue'
 
 const proxyStatus = ref<ProxySettings>({ enabled: false })
-const envStatus = ref<EnvStatus>({ enabled: false })
+const envStatus = ref<{ enabled: boolean, proxyUrl?: string }>({ enabled: false })
 const syncEnabled = ref(false)
 const notificationEnabled = ref(false)
 const systemProxyEnabled = ref(false)
@@ -17,6 +15,10 @@ const systemProxyPort = ref('')
 const checkInterval = ref(5)
 let removeListener: (() => void) | null = null
 let settingsChangeUnsubscribe: (() => void) | null = null
+
+// 使用 VueUse 的暗黑模式功能
+const isDark = useDark()
+const toggleDark = useToggle(isDark)
 
 function updateStatus(settings: ProxySettings) {
   proxyStatus.value = settings
@@ -131,98 +133,79 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="p-4">
+  <div class="dark:bg-#303133 bg-#f4f4f4 p-4 min-h-screen">
     <div class="mx-auto">
       <div class="flex flex-col gap-4">
-        <!-- 标题 -->
-        <div class="text-2xl font-bold text-gray-800">
-          系统代理设置
+        <!-- 标题栏 -->
+        <div class="flex justify-between items-center">
+          <div class="text-2xl font-bold text-gray-800 dark:text-gray-100">
+            系统代理设置
+          </div>
+          <button
+            class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+            @click="toggleDark()"
+          >
+            <span v-if="isDark" class="text-yellow-400">🌞</span>
+            <span v-else class="text-gray-600">🌙</span>
+          </button>
+        </div>
+
+        <!-- 通知状态设置 -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+          <div class="text-lg font-semibold mb-4 text-gray-800 dark:text-gray-100">
+            通知设置
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-gray-700 dark:text-gray-300">通知状态</span>
+            <div class="flex items-center gap-2">
+              <span :class="notificationEnabled ? 'text-green-500' : 'text-red-500'">
+                {{ notificationEnabled ? '已开启' : '已关闭' }}
+              </span>
+              <button
+                class="px-3 py-1 rounded text-sm"
+                :class="notificationEnabled ? 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800' : 'bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800'"
+                @click="toggleNotification(!notificationEnabled)"
+              >
+                {{ notificationEnabled ? '关闭通知' : '开启通知' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 同步状态设置 -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+          <div class="text-lg font-semibold mb-4 text-gray-800 dark:text-gray-100">
+            同步设置
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-gray-700 dark:text-gray-300">同步状态</span>
+            <div class="flex items-center gap-2">
+              <span :class="syncEnabled ? 'text-green-500' : 'text-red-500'">
+                {{ syncEnabled ? '已开启' : '已关闭' }}
+              </span>
+              <button
+                class="px-3 py-1 rounded text-sm"
+                :class="syncEnabled ? 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800' : 'bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800'"
+                @click="toggleSync(!syncEnabled)"
+              >
+                {{ syncEnabled ? '关闭同步' : '开启同步' }}
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- 双栏布局 -->
         <div class="flex gap-4">
           <!-- 左侧系统代理状态 -->
-          <div class="flex-1 bg-white rounded-lg shadow p-4">
-            <div class="text-lg font-semibold mb-4">
-              系统代理状态
-            </div>
-            <div class="space-y-4">
-              <div class="flex items-center justify-between">
-                <span class="text-gray-700">代理状态</span>
-                <span :class="proxyStatus.enabled ? 'text-green-500' : 'text-red-500'">
-                  {{ proxyStatus.enabled ? '已启用' : '已禁用' }}
-                </span>
-              </div>
-              <div v-if="proxyStatus.enabled" class="space-y-2">
-                <div class="flex items-center justify-between">
-                  <span class="text-gray-700">代理服务器</span>
-                  <span class="text-gray-900">{{ proxyStatus.host }}</span>
-                </div>
-                <div class="flex items-center justify-between">
-                  <span class="text-gray-700">代理端口</span>
-                  <span class="text-gray-900">{{ proxyStatus.port }}</span>
-                </div>
-              </div>
-              <div class="flex items-center justify-between">
-                <span class="text-gray-700">通知状态</span>
-                <div class="flex items-center gap-2">
-                  <span :class="notificationEnabled ? 'text-green-500' : 'text-red-500'">
-                    {{ notificationEnabled ? '已开启' : '已关闭' }}
-                  </span>
-                  <button
-                    class="px-3 py-1 rounded text-sm"
-                    :class="notificationEnabled ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-green-100 text-green-600 hover:bg-green-200'"
-                    @click="toggleNotification(!notificationEnabled)"
-                  >
-                    {{ notificationEnabled ? '关闭通知' : '开启通知' }}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+          <SystemProxyStatus :proxy-status="proxyStatus" class="flex-1" />
 
           <!-- 右侧环境变量状态 -->
-          <div class="flex-1 bg-white rounded-lg shadow p-4">
-            <div class="text-lg font-semibold mb-4">
-              环境变量状态
-            </div>
-            <div class="space-y-4">
-              <div class="flex items-center justify-between">
-                <span class="text-gray-700">同步状态</span>
-                <div class="flex items-center gap-2">
-                  <span :class="syncEnabled ? 'text-green-500' : 'text-red-500'">
-                    {{ syncEnabled ? '已开启' : '已关闭' }}
-                  </span>
-                  <button
-                    class="px-3 py-1 rounded text-sm"
-                    :class="syncEnabled ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-green-100 text-green-600 hover:bg-green-200'"
-                    @click="toggleSync(!syncEnabled)"
-                  >
-                    {{ syncEnabled ? '关闭同步' : '开启同步' }}
-                  </button>
-                </div>
-              </div>
-              <div v-if="envStatus.enabled" class="space-y-2">
-                <div class="flex items-center justify-between">
-                  <span class="text-gray-700">HTTP_PROXY</span>
-                  <span class="text-gray-900">{{ envStatus.proxyUrl }}</span>
-                </div>
-                <div class="flex items-center justify-between">
-                  <span class="text-gray-700">HTTPS_PROXY</span>
-                  <span class="text-gray-900">{{ envStatus.proxyUrl }}</span>
-                </div>
-                <div class="flex items-center justify-between">
-                  <span class="text-gray-700">ALL_PROXY</span>
-                  <span class="text-gray-900">{{ envStatus.proxyUrl }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          <EnvStatus :env-status="envStatus" class="flex-1" />
         </div>
 
         <!-- 检查间隔设置 -->
-        <div class="bg-white rounded-lg shadow p-4">
-          <div class="text-lg font-semibold mb-4">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+          <div class="text-lg font-semibold mb-4 text-gray-800 dark:text-gray-100">
             检查间隔设置
           </div>
           <div class="flex items-center gap-4">
@@ -231,10 +214,10 @@ onUnmounted(() => {
               type="number"
               min="1"
               max="60"
-              class="w-20 px-3 py-2 border rounded"
+              class="w-20 px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
               @change="updateCheckInterval(checkInterval)"
             >
-            <span class="text-gray-700">秒</span>
+            <span class="text-gray-700 dark:text-gray-300">秒</span>
           </div>
         </div>
       </div>
@@ -243,5 +226,64 @@ onUnmounted(() => {
 </template>
 
 <style>
-/* 删除所有样式，因为已经使用 UnoCSS 替换 */
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  overflow: hidden;
+}
+
+#app {
+  overflow-y: auto;
+}
+
+/* 消息提示样式 */
+.message {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 12px 24px;
+  border-radius: 8px;
+  z-index: 1000;
+  animation: slideIn 0.3s ease-out;
+}
+
+.message.success {
+  background-color: #10b981;
+  color: white;
+}
+
+.message.error {
+  background-color: #ef4444;
+  color: white;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* 暗黑模式过渡效果 */
+.dark {
+  color-scheme: dark;
+}
+
+.dark * {
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
+}
 </style>
