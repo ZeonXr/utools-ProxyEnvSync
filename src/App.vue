@@ -34,6 +34,7 @@ function updateStatus(settings: ProxySettings) {
 
 async function updateEnvStatus() {
   envStatus.value = await window.customApis.getEnvStatus()
+  console.log('envStatus', envStatus.value)
 }
 
 // 切换同步状态
@@ -130,7 +131,7 @@ onUnmounted(() => {
   <div class="flex flex-col gap-4 p-4">
     <!-- 标题栏 -->
     <div class="flex justify-between items-center">
-      <div class="text-2xl font-bold text-gray-800 dark:text-gray-100">
+      <div class="text-2xl font-bold text-gray-800 dark:text-gray-100" @click="updateEnvStatus">
         系统代理设置
       </div>
       <button

@@ -1,4 +1,5 @@
 import { exec } from 'node:child_process'
+import fs from 'node:fs/promises'
 import os from 'node:os'
 import process from 'node:process'
 import { promisify } from 'node:util'
@@ -445,36 +446,48 @@ ${PROXY_CONFIG_END}' "${configPath}" > "${tempFile}"`)
     return this.currentSettings
   }
 
+  private getConfigPath(): string | null {
+    const homeDir = process.env.HOME || process.env.USERPROFILE
+    if (!homeDir) {
+      return null
+    }
+
+    // 根据操作系统选择配置文件
+    let configPath: string
+    let shellConfigFile: string
+    switch (this.platform) {
+      case 'win32':
+        shellConfigFile = '.bash_profile'
+        configPath = `${homeDir}\\${shellConfigFile}`
+        break
+      case 'darwin': // macOS
+        shellConfigFile = '.zshrc'
+        configPath = `${homeDir}/${shellConfigFile}`
+        break
+      default:
+        shellConfigFile = process.env.SHELL?.includes('zsh') ? '.zshrc' : '.bash_profile'
+        configPath = `${homeDir}/${shellConfigFile}`
+    }
+
+    return configPath
+  }
+
   public async getEnvStatus(): Promise<{ enabled: boolean, proxyUrl?: string }> {
     try {
-      const homeDir = process.env.HOME || process.env.USERPROFILE
-      if (!homeDir) {
+      const configPath = this.getConfigPath()
+      if (!configPath) {
         return { enabled: false }
       }
+      // 使用 Node.js 的 fs 模块读取文件
+      const content = await fs.readFile(configPath, 'utf-8')
 
-      const shellConfigFile = this.platform === 'win32'
-        ? '.bash_profile'
-        : process.env.SHELL?.includes('zsh')
-          ? '.zshrc'
-          : '.bash_profile'
-
-      const configPath = this.platform === 'win32'
-        ? `${homeDir}\\${shellConfigFile}`
-        : `${homeDir}/${shellConfigFile}`
-
-      try {
-        const { stdout } = await execAsync(`cat "${configPath}" | grep "export http_proxy"`)
-        if (stdout) {
-          const match = stdout.match(/export http_proxy="(.+)"/)
-          return {
-            enabled: true,
-            proxyUrl: match?.[1],
-          }
+      // 使用正则表达式查找代理设置
+      const proxyMatch = content.match(/export\s+http_proxy=`([^"]+?)`/)
+      if (proxyMatch) {
+        return {
+          enabled: true,
+          proxyUrl: proxyMatch[1],
         }
-      }
-      catch {
-        // 如果没有找到配置，返回未启用状态
-        return { enabled: false }
       }
 
       return { enabled: false }
