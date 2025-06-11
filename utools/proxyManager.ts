@@ -69,15 +69,18 @@ class ProxyManager {
     return ProxyManager.instance
   }
 
-  public onSettingsChange(callback: SettingsChangeCallback): void {
+  public onSettingsChange(callback: SettingsChangeCallback): () => void {
     this.settingsChangeListeners.push(callback)
     // 立即通知当前状态
     callback(this.getCurrentSettings())
+    return () => {
+      this.settingsChangeListeners = this.settingsChangeListeners.filter(cb => cb !== callback)
+    }
   }
 
-  public removeSettingsChangeListener(callback: SettingsChangeCallback): void {
-    this.settingsChangeListeners = this.settingsChangeListeners.filter(cb => cb !== callback)
-  }
+  // public removeSettingsChangeListener(callback: SettingsChangeCallback): void {
+  //   this.settingsChangeListeners = this.settingsChangeListeners.filter(cb => cb !== callback)
+  // }
 
   private notifySettingsChange(settings: ProxySettings): void {
     this.settingsChangeListeners.forEach(callback => callback(settings))

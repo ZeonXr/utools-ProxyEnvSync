@@ -21,8 +21,6 @@ const systemProxyEnabled = ref(false)
 const systemProxyHost = ref('')
 const systemProxyPort = ref('')
 const checkInterval = ref(5)
-let removeListener: (() => void) | null = null
-let settingsChangeUnsubscribe: (() => void) | null = null
 
 // 使用 VueUse 的暗黑模式功能
 const isDark = useDark()
@@ -38,14 +36,14 @@ function updateStatus(settings: ProxySettings) {
 }
 
 async function updateEnvStatus() {
-  envStatus.value = await window.customApis.getEnvStatus()
+  envStatus.value = await window.proxyManager.getEnvStatus()
   console.log('envStatus', envStatus.value)
 }
 
 // 切换同步状态
 async function toggleSync(enabled: boolean) {
   try {
-    await window.customApis.setSyncEnabled(enabled)
+    await window.proxyManager.setSyncEnabled(enabled)
     syncEnabled.value = enabled
     showMessage(enabled ? '已开启同步' : '已关闭同步')
   }
@@ -60,7 +58,7 @@ async function toggleSync(enabled: boolean) {
 // 切换通知状态
 async function toggleNotification(enabled: boolean) {
   try {
-    await window.customApis.setNotificationEnabled(enabled)
+    await window.proxyManager.setNotificationEnabled(enabled)
     notificationEnabled.value = enabled
     showMessage(enabled ? '已开启通知' : '已关闭通知')
   }
@@ -75,14 +73,14 @@ async function toggleNotification(enabled: boolean) {
 // 更新检查间隔
 async function updateCheckInterval(value: number) {
   try {
-    await window.customApis.setCheckInterval(value * 1000)
+    await window.proxyManager.setCheckInterval(value * 1000)
     showMessage('已更新检查间隔')
   }
   catch (error) {
     console.error('更新检查间隔失败:', error)
     showMessage('更新检查间隔失败', 'error')
     // 恢复原值
-    checkInterval.value = await window.customApis.getCheckInterval() / 1000
+    checkInterval.value = await window.proxyManager.getCheckInterval() / 1000
   }
 }
 
@@ -97,14 +95,14 @@ function handleSettingsChange(settings: ProxySettings) {
 // 获取当前设置
 async function getCurrentSettings() {
   try {
-    const settings = await window.customApis.getCurrentSettings()
+    const settings = await window.proxyManager.getCurrentSettings()
     systemProxyEnabled.value = settings.enabled
     systemProxyHost.value = settings.host || ''
     systemProxyPort.value = String(settings.port) || ''
-    envStatus.value = await window.customApis.getEnvStatus()
-    syncEnabled.value = await window.customApis.getSyncEnabled()
-    notificationEnabled.value = await window.customApis.getNotificationEnabled()
-    checkInterval.value = await window.customApis.getCheckInterval() / 1000
+    envStatus.value = await window.proxyManager.getEnvStatus()
+    syncEnabled.value = await window.proxyManager.getSyncEnabled()
+    notificationEnabled.value = await window.proxyManager.getNotificationEnabled()
+    checkInterval.value = await window.proxyManager.getCheckInterval() / 1000
   }
   catch (error) {
     console.error('获取设置失败:', error)
@@ -112,20 +110,29 @@ async function getCurrentSettings() {
   }
 }
 
+// let removeListener: (() => void) | null = null
+let settingsChangeUnsubscribe: (() => void) | null = null
 onMounted(async () => {
-  // 使用实时状态更新
-  removeListener = window.customApis.onSettingsChange(updateStatus)
-  // 初始化环境变量状态
-  await updateEnvStatus()
-  // 初始化同步状态
-  syncEnabled.value = window.customApis.getSyncEnabled()
-  settingsChangeUnsubscribe = window.customApis.onSettingsChange(handleSettingsChange)
+  // // 使用实时状态更新
+  // removeListener = window.proxyManager.onSettingsChange(updateStatus)
+  // // 初始化环境变量状态
+  // await updateEnvStatus()
+  // // 初始化同步状态
+  // syncEnabled.value = window.proxyManager.getSyncEnabled()
+  // settingsChangeUnsubscribe = window.proxyManager.onSettingsChange(handleSettingsChange)
+  settingsChangeUnsubscribe = window.proxyManager.onSettingsChange((settings) => {
+    updateStatus(settings)
+    handleSettingsChange(settings)
+  })
 })
 
 onUnmounted(() => {
-  if (removeListener) {
-    removeListener()
-  }
+  // if (removeListener) {
+  //   removeListener()
+  // }
+  // if (settingsChangeUnsubscribe) {
+  //   settingsChangeUnsubscribe()
+  // }
   if (settingsChangeUnsubscribe) {
     settingsChangeUnsubscribe()
   }
