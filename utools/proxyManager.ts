@@ -8,13 +8,13 @@ const execAsync = promisify(exec)
 
 // 默认检查系统代理状态的刷新频率（毫秒）
 const DEFAULT_PROXY_CHECK_INTERVAL = 5000
-const STORAGE_KEY = 'autoProxy.syncEnabled'
-const CHECK_INTERVAL_KEY = 'autoProxy.checkInterval'
-const NOTIFICATION_ENABLED_KEY = 'autoProxy.notificationEnabled'
+const STORAGE_KEY = 'proxyEnvSync.syncEnabled'
+const CHECK_INTERVAL_KEY = 'proxyEnvSync.checkInterval'
+const NOTIFICATION_ENABLED_KEY = 'proxyEnvSync.notificationEnabled'
 
 // 配置文件中的标记
-const PROXY_CONFIG_BEGIN = '# BEGIN: AutoProxy Configuration'
-const PROXY_CONFIG_END = '# END: AutoProxy Configuration'
+const PROXY_CONFIG_BEGIN = '# BEGIN: ProxyEnvSync Configuration'
+const PROXY_CONFIG_END = '# END: ProxyEnvSync Configuration'
 
 // 环境变量配置
 const ENV_VARS = ['all_proxy', 'http_proxy', 'https_proxy'] as const
