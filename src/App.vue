@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ProxySettings } from '@/utools/proxyManager'
+import type { ENV_VAR } from '@/utools/proxyManager'
 import { useDark, useToggle } from '@vueuse/core'
 import { onMounted, onUnmounted, ref } from 'vue'
 import Card from './components/Card.vue'
@@ -9,7 +10,11 @@ import SystemProxyStatus from './components/SystemProxyStatus.vue'
 import { useToast } from './composables/useToast'
 
 const proxyStatus = ref<ProxySettings>({ enabled: false })
-const envStatus = ref<{ enabled: boolean, proxyUrl?: string }>({ enabled: false })
+const envStatus = ref<Record<ENV_VAR, string>>({
+  all_proxy: '',
+  http_proxy: '',
+  https_proxy: '',
+})
 const syncEnabled = ref(false)
 const notificationEnabled = ref(false)
 const systemProxyEnabled = ref(false)

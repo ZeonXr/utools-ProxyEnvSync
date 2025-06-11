@@ -17,29 +17,19 @@ const PROXY_CONFIG_BEGIN = '# BEGIN: AutoProxy Configuration'
 const PROXY_CONFIG_END = '# END: AutoProxy Configuration'
 
 // 环境变量配置
-const ENV_HTTP_PROXY = 'export http_proxy'
-const ENV_HTTPS_PROXY = 'export https_proxy'
-const ENV_ALL_PROXY = 'export all_proxy'
-const ENV_HTTP_PROXY_UPPER = 'export HTTP_PROXY'
-const ENV_HTTPS_PROXY_UPPER = 'export HTTPS_PROXY'
-const ENV_ALL_PROXY_UPPER = 'export ALL_PROXY'
+const ENV_VARS = ['all_proxy', 'http_proxy', 'https_proxy'] as const
+export type ENV_VAR = (typeof ENV_VARS)[number]
 
 // 生成代理配置数组
-function generateProxyConfigArray(proxyUrl: string): string[] {
-  return [
-    `${ENV_HTTP_PROXY}="${proxyUrl}"`,
-    `${ENV_HTTPS_PROXY}="${proxyUrl}"`,
-    `${ENV_ALL_PROXY}="${proxyUrl}"`,
-    `${ENV_HTTP_PROXY_UPPER}="${proxyUrl}"`,
-    `${ENV_HTTPS_PROXY_UPPER}="${proxyUrl}"`,
-    `${ENV_ALL_PROXY_UPPER}="${proxyUrl}"`,
-  ]
+function generateProxyConfigArray(proxyUrl: string, platform: string): string[] {
+  const quote = platform === 'win32' ? '`' : '"'
+  return ENV_VARS.map(env => `export ${env}=${quote}${proxyUrl}${quote}`)
 }
 
 // 生成完整的代理配置
-function generateProxyConfig(proxyUrl: string): string {
+function generateProxyConfig(proxyUrl: string, platform: string): string {
   return `${PROXY_CONFIG_BEGIN}
-${generateProxyConfigArray(proxyUrl).join('\n')}
+${generateProxyConfigArray(proxyUrl, platform).join('\n')}
 ${PROXY_CONFIG_END}`
 }
 
@@ -353,7 +343,7 @@ class ProxyManager {
 
       if (settings.enabled && settings.host && settings.port) {
         const proxyUrl = `http://${settings.host}:${settings.port}`
-        const proxyConfig = generateProxyConfig(proxyUrl)
+        const proxyConfig = generateProxyConfig(proxyUrl, this.platform)
 
         console.log('准备更新代理配置:', {
           configPath,
@@ -377,7 +367,7 @@ class ProxyManager {
           if (count === 0) {
             console.log('添加新的代理配置')
             if (this.platform === 'win32') {
-              const proxyConfigArray = generateProxyConfigArray(proxyUrl).map(line => line.replace(/"/g, '`"'))
+              const proxyConfigArray = generateProxyConfigArray(proxyUrl, this.platform)
               await execAsync(`powershell -Command "$content = Get-Content '${configPath}' -Encoding UTF8; $newContent = @(); $inProxySection = $false; foreach ($line in $content) { if ($line -eq '${PROXY_CONFIG_BEGIN}') { $newContent += $line; $newContent += '${proxyConfigArray.join('\', \'')}'; $inProxySection = $true } elseif ($line -eq '${PROXY_CONFIG_END}') { if ($inProxySection) { $newContent += $line; $inProxySection = $false } } elseif (-not $inProxySection) { $newContent += $line } }; if (-not ($newContent -contains '${PROXY_CONFIG_BEGIN}') -or -not ($newContent -contains '${PROXY_CONFIG_END}')) { $newContent = @('${PROXY_CONFIG_BEGIN}', '${proxyConfigArray.join('\', \'')}', '${PROXY_CONFIG_END}') }; $newContent | Set-Content '${configPath}' -Encoding UTF8"`)
             }
             else {
@@ -390,7 +380,7 @@ class ProxyManager {
             // 删除旧的配置
             if (this.platform === 'win32') {
               // Windows 下使用 PowerShell 删除配置并保留注释标记
-              const proxyConfigArray = generateProxyConfigArray(proxyUrl).map(line => line.replace(/"/g, '`"'))
+              const proxyConfigArray = generateProxyConfigArray(proxyUrl, this.platform)
               await execAsync(`powershell -Command "$content = Get-Content '${configPath}' -Encoding UTF8; $newContent = @(); $inProxySection = $false; foreach ($line in $content) { if ($line -eq '${PROXY_CONFIG_BEGIN}') { $newContent += $line; $newContent += '${proxyConfigArray.join('\', \'')}'; $inProxySection = $true } elseif ($line -eq '${PROXY_CONFIG_END}') { if ($inProxySection) { $newContent += $line; $inProxySection = $false } } elseif (-not $inProxySection) { $newContent += $line } }; if (-not ($newContent -contains '${PROXY_CONFIG_BEGIN}') -or -not ($newContent -contains '${PROXY_CONFIG_END}')) { $newContent = @('${PROXY_CONFIG_BEGIN}', '${proxyConfigArray.join('\', \'')}', '${PROXY_CONFIG_END}') }; $newContent | Set-Content '${configPath}' -Encoding UTF8"`)
             }
             else {
@@ -398,7 +388,7 @@ class ProxyManager {
               const tempFile = `${configPath}.tmp`
               await execAsync(`sed -e '/${PROXY_CONFIG_BEGIN}/,/${PROXY_CONFIG_END}/c\\
 ${PROXY_CONFIG_BEGIN}\\
-${generateProxyConfigArray(proxyUrl).join('\\\n')}\\
+${generateProxyConfigArray(proxyUrl, this.platform).join('\\\n')}\\
 ${PROXY_CONFIG_END}' "${configPath}" > "${tempFile}"`)
               await execAsync(`mv "${tempFile}" "${configPath}"`)
             }
@@ -472,29 +462,39 @@ ${PROXY_CONFIG_END}' "${configPath}" > "${tempFile}"`)
     return configPath
   }
 
-  public async getEnvStatus(): Promise<{ enabled: boolean, proxyUrl?: string }> {
+  public async getEnvStatus(): Promise<Record<ENV_VAR, string>> {
     try {
       const configPath = this.getConfigPath()
       if (!configPath) {
-        return { enabled: false }
+        return ENV_VARS.reduce((acc, env) => ({ ...acc, [env]: '' }), {} as Record<ENV_VAR, string>)
       }
       // 使用 Node.js 的 fs 模块读取文件
       const content = await fs.readFile(configPath, 'utf-8')
 
-      // 使用正则表达式查找代理设置
-      const proxyMatch = content.match(/export\s+http_proxy="([^"]+)"/)
-      if (proxyMatch) {
-        return {
-          enabled: true,
-          proxyUrl: proxyMatch[1],
-        }
+      // 查找标记之间的内容
+      const beginIndex = content.indexOf(PROXY_CONFIG_BEGIN)
+      const endIndex = content.indexOf(PROXY_CONFIG_END)
+
+      if (beginIndex === -1 || endIndex === -1 || beginIndex >= endIndex) {
+        return ENV_VARS.reduce((acc, env) => ({ ...acc, [env]: '' }), {} as Record<ENV_VAR, string>)
       }
 
-      return { enabled: false }
+      // 提取标记之间的内容
+      const configContent = content.slice(beginIndex, endIndex)
+
+      // 根据系统使用不同的正则表达式
+      const quote = this.platform === 'win32' ? '`' : '"'
+      const result = ENV_VARS.reduce((acc, env) => {
+        const regex = new RegExp(`export\\s+${env}=${quote}([^${quote}]+)${quote}`)
+        const match = configContent.match(regex)
+        return { ...acc, [env]: match ? match[1] : '' }
+      }, {} as Record<ENV_VAR, string>)
+
+      return result
     }
     catch (error) {
       console.error('获取环境变量状态失败:', error)
-      return { enabled: false }
+      return ENV_VARS.reduce((acc, env) => ({ ...acc, [env]: '' }), {} as Record<ENV_VAR, string>)
     }
   }
 
