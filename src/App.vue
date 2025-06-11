@@ -80,7 +80,7 @@ async function updateCheckInterval(value: number) {
     console.error('更新检查间隔失败:', error)
     showMessage('更新检查间隔失败', 'error')
     // 恢复原值
-    checkInterval.value = await window.proxyManager.getCheckInterval() / 1000
+    checkInterval.value = window.proxyManager.getCheckInterval() / 1000
   }
 }
 
@@ -95,14 +95,14 @@ function handleSettingsChange(settings: ProxySettings) {
 // 获取当前设置
 async function getCurrentSettings() {
   try {
-    const settings = await window.proxyManager.getCurrentSettings()
+    const settings = window.proxyManager.getCurrentSettings()
     systemProxyEnabled.value = settings.enabled
     systemProxyHost.value = settings.host || ''
     systemProxyPort.value = String(settings.port) || ''
     envStatus.value = await window.proxyManager.getEnvStatus()
-    syncEnabled.value = await window.proxyManager.getSyncEnabled()
-    notificationEnabled.value = await window.proxyManager.getNotificationEnabled()
-    checkInterval.value = await window.proxyManager.getCheckInterval() / 1000
+    syncEnabled.value = window.proxyManager.getSyncEnabled()
+    notificationEnabled.value = window.proxyManager.getNotificationEnabled()
+    checkInterval.value = window.proxyManager.getCheckInterval() / 1000
   }
   catch (error) {
     console.error('获取设置失败:', error)
@@ -110,16 +110,9 @@ async function getCurrentSettings() {
   }
 }
 
-// let removeListener: (() => void) | null = null
 let settingsChangeUnsubscribe: (() => void) | null = null
 onMounted(async () => {
   // // 使用实时状态更新
-  // removeListener = window.proxyManager.onSettingsChange(updateStatus)
-  // // 初始化环境变量状态
-  // await updateEnvStatus()
-  // // 初始化同步状态
-  // syncEnabled.value = window.proxyManager.getSyncEnabled()
-  // settingsChangeUnsubscribe = window.proxyManager.onSettingsChange(handleSettingsChange)
   settingsChangeUnsubscribe = window.proxyManager.onSettingsChange((settings) => {
     updateStatus(settings)
     handleSettingsChange(settings)
@@ -127,12 +120,6 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  // if (removeListener) {
-  //   removeListener()
-  // }
-  // if (settingsChangeUnsubscribe) {
-  //   settingsChangeUnsubscribe()
-  // }
   if (settingsChangeUnsubscribe) {
     settingsChangeUnsubscribe()
   }
