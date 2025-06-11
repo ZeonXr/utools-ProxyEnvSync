@@ -31,6 +31,9 @@ const { showMessage } = useToast()
 
 function updateStatus(settings: ProxySettings) {
   proxyStatus.value = settings
+  systemProxyEnabled.value = settings.enabled
+  systemProxyHost.value = settings.host || ''
+  systemProxyPort.value = String(settings.port) || ''
   // 当代理状态变化时，也更新环境变量状态
   updateEnvStatus()
 }
@@ -84,22 +87,11 @@ async function updateCheckInterval(value: number) {
   }
 }
 
-// 监听设置变化
-function handleSettingsChange(settings: ProxySettings) {
-  systemProxyEnabled.value = settings.enabled
-  systemProxyHost.value = settings.host || ''
-  systemProxyPort.value = String(settings.port) || ''
-  getCurrentSettings()
-}
-
 // 获取当前设置
 async function getCurrentSettings() {
   try {
     const settings = window.proxyManager.getCurrentSettings()
-    systemProxyEnabled.value = settings.enabled
-    systemProxyHost.value = settings.host || ''
-    systemProxyPort.value = String(settings.port) || ''
-    envStatus.value = await window.proxyManager.getEnvStatus()
+    updateStatus(settings)
     syncEnabled.value = window.proxyManager.getSyncEnabled()
     notificationEnabled.value = window.proxyManager.getNotificationEnabled()
     checkInterval.value = window.proxyManager.getCheckInterval() / 1000
@@ -112,11 +104,8 @@ async function getCurrentSettings() {
 
 let settingsChangeUnsubscribe: (() => void) | null = null
 onMounted(async () => {
-  // // 使用实时状态更新
-  settingsChangeUnsubscribe = window.proxyManager.onSettingsChange((settings) => {
-    updateStatus(settings)
-    handleSettingsChange(settings)
-  })
+  settingsChangeUnsubscribe = window.proxyManager.onSettingsChange(updateStatus)
+  await getCurrentSettings()
 })
 
 onUnmounted(() => {

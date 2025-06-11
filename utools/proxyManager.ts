@@ -514,6 +514,7 @@ ${PROXY_CONFIG_END}' "${configPath}" > "${tempFile}"`)
     else if (this.currentSettings.enabled) {
       await this.updateEnvironmentVariables(this.currentSettings)
     }
+    this.notifySettingsChange(this.currentSettings)
   }
 
   public getSyncEnabled(): boolean {
