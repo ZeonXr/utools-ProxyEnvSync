@@ -47,7 +47,7 @@ class ProxyManager {
   private checkInterval: NodeJS.Timeout | null = null
   private platform: string
   private networkInterface: string | null = null
-  private settingsChangeListeners: SettingsChangeCallback[] = []
+  private settingsChangeListeners: Set<SettingsChangeCallback> = new Set()
   private syncEnabled: boolean
   private checkIntervalMs: number
   private notificationEnabled: boolean
@@ -70,11 +70,11 @@ class ProxyManager {
   }
 
   public onSettingsChange(callback: SettingsChangeCallback): () => void {
-    this.settingsChangeListeners.push(callback)
+    this.settingsChangeListeners.add(callback)
     // 立即通知当前状态
     callback(this.getCurrentSettings())
     return () => {
-      this.settingsChangeListeners = this.settingsChangeListeners.filter(cb => cb !== callback)
+      this.settingsChangeListeners.delete(callback)
     }
   }
 
