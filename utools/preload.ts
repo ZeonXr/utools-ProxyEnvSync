@@ -7,7 +7,7 @@ const proxyManager = ProxyManager.getInstance()
 proxyManager.startMonitoring()
 
 // 定义要暴露给渲染进程的 API
-const customApis = {
+export const customApis = {
   // 获取当前系统代理设置
   getCurrentSettings: () => proxyManager.getCurrentSettings(),
 
@@ -37,12 +37,6 @@ const customApis = {
     proxyManager.onSettingsChange(callback)
     return () => proxyManager.removeSettingsChangeListener(callback)
   },
-}
-
-declare global {
-  interface Window {
-    customApis: typeof customApis
-  }
 }
 
 window.customApis = customApis
