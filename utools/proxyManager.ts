@@ -482,7 +482,7 @@ ${PROXY_CONFIG_END}' "${configPath}" > "${tempFile}"`)
       const content = await fs.readFile(configPath, 'utf-8')
 
       // 使用正则表达式查找代理设置
-      const proxyMatch = content.match(/export\s+http_proxy=`([^"]+?)`/)
+      const proxyMatch = content.match(/export\s+http_proxy="([^"]+)"/)
       if (proxyMatch) {
         return {
           enabled: true,
