@@ -1,3 +1,3 @@
-import { install } from '@qc2168/vite-plugin-utools';
+import { install } from '@qc2168/vite-plugin-utools'
 
-install(['./dist/preload.js']);
+install(['./dist/preload.js'])
