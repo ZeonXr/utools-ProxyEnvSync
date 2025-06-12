@@ -1,10 +1,10 @@
 {
   "name": "proxy-env-sync",
   "type": "module",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Synchronize system proxy settings with environment variables",
-  "author": "QC2168",
+  "author": "ZeonXr",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc && vite build && node ./scripts/build.js",
