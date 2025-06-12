@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ProxySettings } from '@/utools/proxyManager'
 import type { ENV_VAR } from '@/utools/proxyManager'
-import { useDark, useToggle } from '@vueuse/core'
+import { useDark } from '@vueuse/core'
 import { onMounted, onUnmounted, ref } from 'vue'
 import Card from './components/Card.vue'
 import EnvStatus from './components/EnvStatus.vue'
@@ -21,10 +21,16 @@ const systemProxyEnabled = ref(false)
 const systemProxyHost = ref('')
 const systemProxyPort = ref('')
 const checkInterval = ref(5)
-
+useDark({
+  storageKey: null, // 禁用持久化
+  initialValue: 'auto', // 默认跟随系统
+})
 // 使用 VueUse 的暗黑模式功能
-const isDark = useDark()
-const toggleDark = useToggle(isDark)
+// const isDark = useDark({
+//   storageKey: null, // 禁用持久化
+//   initialValue: 'auto', // 默认跟随系统
+// })
+// const toggleDark = useToggle(isDark)
 
 // 使用 Toast
 const { showMessage } = useToast()
@@ -118,7 +124,7 @@ onUnmounted(() => {
 <template>
   <div class="flex flex-col gap-4 p-4">
     <!-- 标题栏 -->
-    <div class="flex justify-between items-center">
+    <!-- <div class="flex justify-between items-center">
       <div class="text-2xl font-bold text-gray-800 dark:text-gray-100" @click="updateEnvStatus">
         系统代理设置
       </div>
@@ -129,7 +135,7 @@ onUnmounted(() => {
         <span v-if="isDark" class="text-yellow-400">🌞</span>
         <span v-else class="text-gray-600">🌙</span>
       </button>
-    </div>
+    </div> -->
 
     <!-- 双栏布局 -->
     <div class="flex gap-4">
@@ -144,7 +150,7 @@ onUnmounted(() => {
     <Card title="设置">
       <div class="space-y-4">
         <div class="flex items-center justify-between line-height-6">
-          <span class="text-gray-700 dark:text-gray-300">通知状态</span>
+          <span class="text-gray-700 dark:text-gray-300">变更通知</span>
           <div class="flex items-center gap-2">
             <Switch v-model="notificationEnabled" @update:model-value="toggleNotification" />
           </div>
@@ -155,21 +161,20 @@ onUnmounted(() => {
             <Switch v-model="syncEnabled" @update:model-value="toggleSync" />
           </div>
         </div>
-      </div>
-    </Card>
-
-    <!-- 检查间隔设置 -->
-    <Card title="检查间隔设置">
-      <div class="flex items-center gap-4">
-        <input
-          v-model="checkInterval"
-          type="number"
-          min="1"
-          max="60"
-          class="w-20 px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
-          @change="updateCheckInterval(checkInterval)"
-        >
-        <span class="text-gray-700 dark:text-gray-300">秒</span>
+        <div class="flex items-center justify-between line-height-6">
+          <span class="text-gray-700 dark:text-gray-300">检查间隔</span>
+          <div class="flex items-center gap-2">
+            <input
+              v-model.number.lazy="checkInterval"
+              type="number"
+              min="1"
+              max="60"
+              class="w-20 px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+              @change="updateCheckInterval(checkInterval)"
+            >
+            <span class="text-gray-700 dark:text-gray-300">秒</span>
+          </div>
+        </div>
       </div>
     </Card>
   </div>
