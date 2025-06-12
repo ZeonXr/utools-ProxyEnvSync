@@ -7,7 +7,7 @@ import { promisify } from 'node:util'
 const execAsync = promisify(exec)
 
 // 默认检查系统代理状态的刷新频率（毫秒）
-const DEFAULT_PROXY_CHECK_INTERVAL = 5000
+const DEFAULT_PROXY_CHECK_INTERVAL = 20000
 const STORAGE_KEY = 'proxyEnvSync.syncEnabled'
 const CHECK_INTERVAL_KEY = 'proxyEnvSync.checkInterval'
 const NOTIFICATION_ENABLED_KEY = 'proxyEnvSync.notificationEnabled'
