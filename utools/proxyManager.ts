@@ -21,13 +21,13 @@ const ENV_VARS = ['all_proxy', 'http_proxy', 'https_proxy'] as const
 export type ENV_VAR = (typeof ENV_VARS)[number]
 
 // 生成代理配置数组
-function generateProxyConfigArray(proxyUrl: string, platform: string): string[] {
+function generateProxyConfigArray(proxyUrl: string, platform: NodeJS.Platform): string[] {
   const quote = platform === 'win32' ? '`' : '"'
   return ENV_VARS.map(env => `export ${env}=${quote}${proxyUrl}${quote}`)
 }
 
 // 生成完整的代理配置
-function generateProxyConfig(proxyUrl: string, platform: string): string {
+function generateProxyConfig(proxyUrl: string, platform: NodeJS.Platform): string {
   return `${PROXY_CONFIG_BEGIN}
 ${generateProxyConfigArray(proxyUrl, platform).join('\n')}
 ${PROXY_CONFIG_END}`
@@ -45,7 +45,7 @@ class ProxyManager {
   private static instance: ProxyManager
   private currentSettings: ProxySettings = { enabled: false }
   private checkInterval: NodeJS.Timeout | null = null
-  private platform: string
+  private platform: NodeJS.Platform
   private networkInterface: string | null = null
   private settingsChangeListeners: Set<SettingsChangeCallback> = new Set()
   private syncEnabled: boolean
@@ -298,28 +298,14 @@ class ProxyManager {
     }
   }
 
-  private async updateEnvironmentVariables(settings: ProxySettings): Promise<void> {
-    const homeDir = process.env.HOME || process.env.USERPROFILE
-    if (!homeDir) {
-      console.error('无法获取用户主目录')
+  /**
+   * @param settings 代理设置
+   */
+  public async updateEnvironmentVariables(settings: ProxySettings): Promise<void> {
+    const configPath = this.getConfigPath()
+    if (!configPath) {
+      console.error('无法获取配置文件路径')
       return
-    }
-
-    // 根据操作系统选择配置文件
-    let configPath: string
-    let shellConfigFile: string
-    switch (this.platform) {
-      case 'win32':
-        shellConfigFile = '.bash_profile'
-        configPath = `${homeDir}\\${shellConfigFile}`
-        break
-      case 'darwin': // macOS
-        shellConfigFile = '.zshrc'
-        configPath = `${homeDir}/${shellConfigFile}`
-        break
-      default:
-        shellConfigFile = process.env.SHELL?.includes('zsh') ? '.zshrc' : '.bash_profile'
-        configPath = `${homeDir}/${shellConfigFile}`
     }
 
     try {
@@ -410,28 +396,50 @@ ${PROXY_CONFIG_END}' "${configPath}" > "${tempFile}"`)
       }
       else {
         console.log('删除代理配置')
-        // 删除代理配置但保留注释标记
-        try {
-          if (this.platform === 'win32') {
-            // Windows 下使用 PowerShell 删除所有配置并只保留一对标记
-            await execAsync(`powershell -Command "$content = Get-Content '${configPath}' -Encoding UTF8; $newContent = @(); $inProxySection = $false; foreach ($line in $content) { if ($line -eq '${PROXY_CONFIG_BEGIN}') { if (-not $inProxySection) { $newContent += $line; $inProxySection = $true } } elseif ($line -eq '${PROXY_CONFIG_END}') { if ($inProxySection) { $newContent += $line; $inProxySection = $false } } elseif (-not $inProxySection) { $newContent += $line } }; if (-not ($newContent -contains '${PROXY_CONFIG_BEGIN}') -or -not ($newContent -contains '${PROXY_CONFIG_END}')) { $newContent = @('${PROXY_CONFIG_BEGIN}', '${PROXY_CONFIG_END}') }; $newContent | Set-Content '${configPath}' -Encoding UTF8"`)
-          }
-          else {
-            // 使用 sed 删除所有配置并只保留一对标记
-            const tempFile = `${configPath}.tmp`
-            await execAsync(`sed -e '/${PROXY_CONFIG_BEGIN}/,/${PROXY_CONFIG_END}/d' "${configPath}" > "${tempFile}"`)
-            await execAsync(`echo '${PROXY_CONFIG_BEGIN}' >> "${tempFile}"`)
-            await execAsync(`echo '${PROXY_CONFIG_END}' >> "${tempFile}"`)
-            await execAsync(`mv "${tempFile}" "${configPath}"`)
-          }
-        }
-        catch (error) {
-          console.error('删除代理配置失败:', error)
-        }
+        await this.clearProxyEnv()
       }
     }
     catch (error) {
       console.error('更新环境变量失败:', error)
+    }
+  }
+
+  /**
+   * 清除环境变量（可选是否连同标记一起删除）
+   * @param fullRemove 是否彻底移除标记和内容（插件退出时用）
+   */
+  public async clearProxyEnv(fullRemove: boolean = false): Promise<void> {
+    const configPath = this.getConfigPath()
+    if (!configPath) {
+      console.error('无法获取配置文件路径')
+      return
+    }
+    try {
+      if (fullRemove) {
+        // 彻底删除标记和内容
+        if (this.platform === 'win32') {
+          await execAsync(`powershell -Command "$content = Get-Content '${configPath}' -Encoding UTF8; $newContent = @(); $inProxySection = $false; foreach ($line in $content) { if ($line -eq '${PROXY_CONFIG_BEGIN}') { $inProxySection = $true } elseif ($line -eq '${PROXY_CONFIG_END}') { if ($inProxySection) { $inProxySection = $false } } elseif (-not $inProxySection) { $newContent += $line } }; $newContent | Set-Content '${configPath}' -Encoding UTF8"`)
+        }
+        else {
+          const tempFile = `${configPath}.tmp`
+          await execAsync(`sed -e '/${PROXY_CONFIG_BEGIN}/,/${PROXY_CONFIG_END}/d' "${configPath}" > "${tempFile}"`)
+          await execAsync(`mv "${tempFile}" "${configPath}"`)
+        }
+      }
+      else {
+        // 只清空标记内内容，保留标记
+        if (this.platform === 'win32') {
+          await execAsync(`powershell -Command "$content = Get-Content '${configPath}' -Encoding UTF8; $newContent = @(); $inProxySection = $false; foreach ($line in $content) { if ($line -eq '${PROXY_CONFIG_BEGIN}') { $newContent += $line; $inProxySection = $true } elseif ($line -eq '${PROXY_CONFIG_END}') { if ($inProxySection) { $newContent += $line; $inProxySection = $false } } elseif (-not $inProxySection) { $newContent += $line } }; $newContent | Set-Content '${configPath}' -Encoding UTF8"`)
+        }
+        else {
+          const tempFile = `${configPath}.tmp`
+          await execAsync(`awk '/${PROXY_CONFIG_BEGIN}/ {print; inblock=1; next} /${PROXY_CONFIG_END}/ {inblock=0} !inblock || /${PROXY_CONFIG_END}/' "${configPath}" > "${tempFile}"`)
+          await execAsync(`mv "${tempFile}" "${configPath}"`)
+        }
+      }
+    }
+    catch (error) {
+      console.error('清除代理环境变量失败:', error)
     }
   }
 

@@ -41,6 +41,13 @@ proxyManager.startMonitoring()
 
 window.proxyManager = proxyManager
 
+// 插件退出时清除环境变量
+utools.onPluginOut(async (isKill: boolean) => {
+  if (isKill) {
+    await proxyManager.clearProxyEnv(true)
+  }
+})
+
 declare global {
   interface Window {
     proxyManager: typeof proxyManager
