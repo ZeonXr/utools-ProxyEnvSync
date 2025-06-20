@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ProxySettings } from '@/utools/proxyManager'
+import type { ProxySettings } from '@/utools/controller'
 import Card from './Card.vue'
 
 defineProps<{

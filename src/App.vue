@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import type { ProxySettings } from '@/utools/proxyManager'
-import type { ENV_VAR } from '@/utools/proxyManager'
+import type { ENV_VAR, ProxySettings } from '@/utools/controller'
 import { useDark } from '@vueuse/core'
 import { onMounted, onUnmounted, ref } from 'vue'
 import Card from './components/Card.vue'

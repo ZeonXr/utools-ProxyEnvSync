@@ -1,5 +1,5 @@
 // https://www.u-tools.cn/docs/developer/docs.html
-import ProxyManager from './proxyManager'
+import ProxyManager from './controller'
 
 const proxyManager = ProxyManager.getInstance()
 
@@ -44,7 +44,7 @@ window.proxyManager = proxyManager
 // 插件退出时清除环境变量
 utools.onPluginOut(async (isKill: boolean) => {
   if (isKill) {
-    await proxyManager.clearProxyEnv(true)
+    await proxyManager.clearProxyEnv()
   }
 })
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ENV_VAR } from '@/utools/proxyManager'
+import type { ENV_VAR } from '@/utools/controller'
 import Card from './Card.vue'
 
 defineProps<{
