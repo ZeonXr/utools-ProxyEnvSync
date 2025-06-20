@@ -6,13 +6,21 @@ const Storage: Record<string, [string, any]> = {
 type StorageKey = keyof typeof Storage
 
 export const PluginSettings = (() => {
-  function get(key: StorageKey): any
   function get(): Record<StorageKey, any>
+  function get(key: StorageKey): any
   function get(key?: StorageKey): Record<StorageKey, any> | any {
     if (key === void 0) {
       return Object.fromEntries(Object.entries(Storage).map(([key]) => [key, get(key)]))
     }
-    return utools.dbStorage.getItem(Storage[key][0])
+    else {
+      const value = utools.dbStorage.getItem(Storage[key][0])
+      if (value === void 0) {
+        return Storage[key][1]
+      }
+      else {
+        return value
+      }
+    }
   }
   function set(keyOrObject: Record<StorageKey, any>): void
   function set(keyOrObject: StorageKey, value: any): void
