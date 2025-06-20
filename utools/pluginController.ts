@@ -3,9 +3,34 @@ const Storage: Record<string, [string, any]> = {
   syncEnabled: ['ProxyEnvSync.syncEnabled', false],
   notificationEnabled: ['ProxyEnvSync.notificationEnabled', false],
 } as const
+type StorageKey = keyof typeof Storage
 
 export const PluginSettings = (() => {
+  function get(key: StorageKey): any
+  function get(): Record<StorageKey, any>
+  function get(key?: StorageKey): Record<StorageKey, any> | any {
+    if (key === void 0) {
+      return Object.fromEntries(Object.entries(Storage).map(([key]) => [key, get(key)]))
+    }
+    return utools.dbStorage.getItem(Storage[key][0])
+  }
+  function set(keyOrObject: Record<StorageKey, any>): void
+  function set(keyOrObject: StorageKey, value: any): void
+  function set(keyOrObject: StorageKey | Record<StorageKey, any>, value?: any): void {
+    if (typeof keyOrObject === 'string') {
+      utools.dbStorage.setItem(Storage[keyOrObject][0], value)
+    }
+    else {
+      Object.entries(keyOrObject).forEach(([key, value]) => {
+        utools.dbStorage.setItem(Storage[key][0], value)
+      })
+    }
+  }
 
+  return {
+    get,
+    set,
+  }
 })()
 
 // 状态更新器
