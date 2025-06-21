@@ -1,78 +1,97 @@
-const Storage: Record<string, [string, any]> = {
-  checkInterval: ['ProxyEnvSync.checkInterval', 20000],
-  syncEnabled: ['ProxyEnvSync.syncEnabled', false],
-  notificationEnabled: ['ProxyEnvSync.notificationEnabled', false],
-} as const
+import type { Mutable, PrimitiveType } from './utils'
+import { getType } from './utils'
+
+const Storage = {
+  checkInterval: 20000 as number,
+  syncEnabled: false as boolean,
+  notificationEnabled: false as boolean,
+} as const satisfies Record<string, PrimitiveType>
+
 type StorageKey = keyof typeof Storage
 
-export const PluginSettings = (() => {
-  function get(): Record<StorageKey, any>
-  function get(key: StorageKey): any
-  function get(key?: StorageKey): Record<StorageKey, any> | any {
+export class PluginSettings {
+  static get(): Mutable<typeof Storage>
+  static get<T extends StorageKey>(key: T): typeof Storage[T]
+  static get(key?: StorageKey) {
     if (key === void 0) {
-      return Object.fromEntries(Object.entries(Storage).map(([key]) => [key, get(key)]))
+      return Object.fromEntries(
+        Object.entries(Storage).map(([key]) => [
+          key,
+          PluginSettings.get(key as StorageKey),
+        ]),
+      ) as Mutable<typeof Storage>
     }
     else {
-      const value = utools.dbStorage.getItem(Storage[key][0])
+      const value = utools.dbStorage.getItem(key)
       if (value === void 0) {
-        return Storage[key][1]
+        return PluginSettings.set(key, Storage[key])
       }
-      else {
-        return value
-      }
+      return value
     }
   }
-  function set(keyOrObject: Record<StorageKey, any>): void
-  function set(keyOrObject: StorageKey, value: any): void
-  function set(keyOrObject: StorageKey | Record<StorageKey, any>, value?: any): void {
-    if (typeof keyOrObject === 'string') {
-      utools.dbStorage.setItem(Storage[keyOrObject][0], value)
+
+  static set(keyOrObject: typeof Storage): Mutable<typeof Storage>
+  static set<T extends StorageKey>(
+    keyOrObject: T,
+    value: typeof Storage[T]
+  ): typeof Storage[T]
+  static set(
+    keyOrObject: StorageKey | Record<StorageKey, PrimitiveType>,
+    value?: PrimitiveType,
+  ) {
+    const typeOfKeyOrObject = getType(keyOrObject)
+    switch (typeOfKeyOrObject) {
+      case 'string':
+        if (value !== undefined) {
+          utools.dbStorage.setItem(keyOrObject as StorageKey, value)
+        }
+        return PluginSettings.get(keyOrObject as StorageKey)
+      case 'object':
+        Object.entries(keyOrObject).forEach(([key, value]) => {
+          utools.dbStorage.setItem(key as StorageKey, value)
+        })
+        return PluginSettings.get()
+      default:
+        throw new Error(`不支持的类型: ${typeOfKeyOrObject}`)
     }
-    else {
-      Object.entries(keyOrObject).forEach(([key, value]) => {
-        utools.dbStorage.setItem(Storage[key][0], value)
+  }
+}
+
+export class Monitor {
+  private static monitorInterval: NodeJS.Timeout | null = null
+  private static callbacks: Set<() => any> = new Set()
+
+  static start(checkInterval: number) {
+    this.stop()
+    const runCallbacks = () => {
+      this.callbacks.forEach((callback) => {
+        try {
+          callback()
+        }
+        catch (error) {
+          console.error('执行回调函数时发生错误:', error)
+        }
       })
     }
+    runCallbacks()
+    this.monitorInterval = setInterval(
+      runCallbacks,
+      checkInterval,
+    )
   }
 
-  return {
-    get,
-    set,
-  }
-})()
-
-// 状态更新器
-export const Monitor = (() => {
-  let monitorInterval: NodeJS.Timeout | null = null
-  const callbacks: Set<() => any> = new Set()
-
-  function start() {
-    if (monitorInterval) {
-      clearInterval(monitorInterval)
-    }
-    monitorInterval = setInterval(() => {
-      callbacks.forEach(callback => callback())
-    }, Storage.checkInterval[1])
-  }
-
-  function stop() {
-    if (monitorInterval) {
-      clearInterval(monitorInterval)
+  static stop() {
+    if (this.monitorInterval) {
+      clearInterval(this.monitorInterval)
+      this.monitorInterval = null
     }
   }
 
-  function addCallback(callback: () => any) {
-    callbacks.add(callback)
+  static addCallback(callback: () => any) {
+    this.callbacks.add(callback)
   }
 
-  function removeCallback(callback: () => any) {
-    callbacks.delete(callback)
+  static removeCallback(callback: () => any) {
+    this.callbacks.delete(callback)
   }
-
-  return {
-    start,
-    stop,
-    addCallback,
-    removeCallback,
-  }
-})()
+}
