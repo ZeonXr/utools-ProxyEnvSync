@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import type { ENV_VAR } from '@/utools/controller'
 import Card from './Card.vue'
 
 defineProps<{
-  envStatus: Record<ENV_VAR, string>
+  envStatus: {
+    http_proxy: string
+    https_proxy: string
+    all_proxy: string
+  }
 }>()
 </script>
 

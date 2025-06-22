@@ -7,6 +7,7 @@ const platform = os.platform()
 
 const ENV_VARS = ['all_proxy', 'http_proxy', 'https_proxy'] as const
 export type ENV_VAR = (typeof ENV_VARS)[number]
+export type ProxyEnv = Record<ENV_VAR, string>
 
 const PROXY_CONFIG_BEGIN = '# BEGIN: ProxyEnvSync Configuration'
 const PROXY_CONFIG_END = '# END: ProxyEnvSync Configuration'
@@ -80,15 +81,15 @@ export const setProxyEnv: (proxyUrl: string | null) => void = (() => {
   }
 })()
 
-export const getProxyEnv: () => Record<ENV_VAR, string> = (() => {
-  function parseProxyEnv(content: string): Record<ENV_VAR, string> {
+export const getProxyEnv: () => ProxyEnv = (() => {
+  function parseProxyEnv(content: string): ProxyEnv {
     const begin = content.indexOf(PROXY_CONFIG_BEGIN)
     const end = content.indexOf(PROXY_CONFIG_END)
     if (begin === -1 || end === -1 || begin >= end) {
       return ENV_VARS.reduce((acc, env) => {
         acc[env] = ''
         return acc
-      }, {} as Record<ENV_VAR, string>)
+      }, {} as ProxyEnv)
     }
     const configContent = content.slice(begin, end)
     const quote = platform === 'win32' ? '`' : '"'
@@ -96,11 +97,11 @@ export const getProxyEnv: () => Record<ENV_VAR, string> = (() => {
       const regex = new RegExp(`export\\s+${env}=${quote}([^${quote}]+)${quote}`)
       const match = configContent.match(regex)
       return { ...acc, [env]: match ? match[1] : '' }
-    }, {} as Record<ENV_VAR, string>)
+    }, {} as ProxyEnv)
     return result
   }
   function windows_getProxyEnv() {
-    const result: Record<ENV_VAR, string> = {
+    const result: ProxyEnv = {
       all_proxy: '',
       http_proxy: '',
       https_proxy: '',
@@ -130,7 +131,7 @@ export const getProxyEnv: () => Record<ENV_VAR, string> = (() => {
       return ENV_VARS.reduce((acc, env) => {
         acc[env] = ''
         return acc
-      }, {} as Record<ENV_VAR, string>)
+      }, {} as ProxyEnv)
     }
     const content = fs.readFileSync(configPath, 'utf-8')
     return parseProxyEnv(content)

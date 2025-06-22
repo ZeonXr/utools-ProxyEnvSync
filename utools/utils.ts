@@ -148,3 +148,28 @@ export function isEmpty(value: any): boolean {
 
   return false
 }
+type NotNullOrUndefined<T> = T extends null | undefined ? never : T
+/**
+ * 检查值是否非空（不为null、undefined、空字符串、空数组、空对象）
+ * @param value 要检查的值
+ * @returns 是否非空
+ */
+export function isNotEmpty<T>(value: T): value is NotNullOrUndefined<T> {
+  return !isEmpty(value)
+}
+
+/**
+ * 深度比较两个对象或数组是否相等
+ * @param a 第一个对象或数组
+ * @param b 第二个对象或数组
+ * @returns 是否相等
+ */
+export function jsonEqualObject(a: any, b: any): boolean {
+  try {
+    return JSON.stringify(a) === JSON.stringify(b)
+  }
+  catch (e) {
+    console.error('jsonEqualObject error:', e)
+    return false
+  }
+}

@@ -1,5 +1,5 @@
 import type { Mutable, PrimitiveType } from './utils'
-import { getType } from './utils'
+import { getType, isEmpty, isNotEmpty } from './utils'
 
 const Storage = {
   checkInterval: 20000 as number,
@@ -13,20 +13,21 @@ export class PluginSettings {
   static get(): Mutable<typeof Storage>
   static get<T extends StorageKey>(key: T): typeof Storage[T]
   static get(key?: StorageKey) {
-    if (key === void 0) {
+    if (isNotEmpty(key)) {
+      const value = utools.dbStorage.getItem(key)
+      console.log(`获取设置: ${key} = ${value}`)
+      if (isEmpty(value)) {
+        return PluginSettings.set(key, Storage[key])
+      }
+      return value
+    }
+    else {
       return Object.fromEntries(
         Object.entries(Storage).map(([key]) => [
           key,
           PluginSettings.get(key as StorageKey),
         ]),
       ) as Mutable<typeof Storage>
-    }
-    else {
-      const value = utools.dbStorage.getItem(key)
-      if (value === void 0) {
-        return PluginSettings.set(key, Storage[key])
-      }
-      return value
     }
   }
 
@@ -58,12 +59,20 @@ export class PluginSettings {
 }
 
 export class Monitor {
+  private static checkInterval: number
   private static monitorInterval: NodeJS.Timeout | null = null
   private static callbacks: Set<() => any> = new Set()
 
-  static start(checkInterval: number) {
+  static start(checkInterval?: number) {
+    if (checkInterval !== void 0) {
+      this.checkInterval = checkInterval
+    }
+    if (this.checkInterval === void 0 || this.checkInterval <= 0) {
+      throw new Error('checkInterval 不能为空')
+    }
     this.stop()
     const runCallbacks = () => {
+      console.log('执行回调函数', this.callbacks)
       this.callbacks.forEach((callback) => {
         try {
           callback()
@@ -76,22 +85,24 @@ export class Monitor {
     runCallbacks()
     this.monitorInterval = setInterval(
       runCallbacks,
-      checkInterval,
+      this.checkInterval,
     )
   }
 
   static stop() {
-    if (this.monitorInterval) {
-      clearInterval(this.monitorInterval)
-      this.monitorInterval = null
+    clearInterval(this.monitorInterval!)
+    this.monitorInterval = null
+  }
+
+  static addListener(listener: () => any) {
+    this.callbacks.add(listener)
+    this.start()
+    return () => {
+      this.removeListener(listener)
     }
   }
 
-  static addCallback(callback: () => any) {
-    this.callbacks.add(callback)
-  }
-
-  static removeCallback(callback: () => any) {
-    this.callbacks.delete(callback)
+  static removeListener(listener: () => any) {
+    return this.callbacks.delete(listener)
   }
 }
