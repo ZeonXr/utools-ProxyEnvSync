@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc && vite build && node ./scripts/build.js",
+    "build:skip-typecheck": "vite build && node ./scripts/build.js",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint",

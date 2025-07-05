@@ -1,6 +1,6 @@
 import type { ProxyEnv, ProxySettings } from './ProxyEnvManager'
 import { Monitor, PluginSettings } from './pluginController'
-import { getProxyEnv, getSystemProxy } from './ProxyEnvManager'
+import { getProxyEnv, getSystemProxy, setProxyEnv } from './ProxyEnvManager'
 // import { jsonEqualObject } from './utils'
 
 Monitor.start(PluginSettings.get('checkInterval'))
@@ -53,22 +53,61 @@ utools.onPluginOut(() => {
   })
 })
 
-export function onUpdateStatus(callback: (systemProxy: ProxySettings, env: ProxyEnv) => void) {
-  const removeListener = Monitor.addListener(() => {
+export function onUpdateStatus(callback: (args: { systemProxy: ProxySettings, env: ProxyEnv, forceUpdate: boolean }) => void) {
+  const removeListener = Monitor.addListener((force) => {
     const systemProxy = getSystemProxy()
     const env = getProxyEnv()
-    callback(systemProxy, env)
+    callback({ systemProxy, env, forceUpdate: force })
   })
   const removeCallback = () => {
     removeListener()
     onUpdateStatusRemoveCallbacks.delete(removeCallback)
   }
+
   onUpdateStatusRemoveCallbacks.add(removeCallback)
+
   return removeCallback
 }
 
+let lastSystemProxy: ProxySettings | null = null
+function updateProxyEnv(systemProxy: ProxySettings) {
+  if (systemProxy.enabled && PluginSettings.get('syncEnabled')) {
+    const proxyUrl = `http://${systemProxy.host}:${systemProxy.port}`
+    setProxyEnv(proxyUrl)
+  }
+  else {
+    setProxyEnv(null)
+  }
+}
+const mainProcessStatusListener = onUpdateStatus(({ systemProxy, forceUpdate }) => {
+  if (!forceUpdate && lastSystemProxy && JSON.stringify(lastSystemProxy) === JSON.stringify(systemProxy)) {
+    return
+  }
+  if (PluginSettings.get('notificationEnabled')) {
+    utools.showNotification(`代理状态已更新: ${systemProxy.enabled ? '启用' : '禁用'}\n地址: http://${systemProxy.host}:${systemProxy.port}`)
+  }
+  lastSystemProxy = systemProxy
+  if (systemProxy.enabled && PluginSettings.get('syncEnabled')) {
+    const proxyUrl = `http://${systemProxy.host}:${systemProxy.port}`
+    setProxyEnv(proxyUrl)
+  }
+  else {
+    setProxyEnv(null)
+  }
+  updateProxyEnv(systemProxy)
+})
+utools.onPluginOut((processExit) => {
+  if (processExit) {
+    mainProcessStatusListener()
+  }
+})
+
 const proxyManager = {
   onUpdateStatus,
+  Monitor,
+  PluginSettings,
+  getSystemProxy,
+  updateProxyEnv,
 }
 
 window.proxyManager = proxyManager
@@ -79,12 +118,20 @@ declare global {
   }
 }
 
-let xxx = 1
-utools.onPluginEnter(() => {
-  console.log('插件进入，当前值:', xxx)
-  xxx += 1
-})
+// utools.onPluginEnter(() => {
+//   console.log('插件进入，当前值:', xxx)
+//   xxx += 1
+// })
 
 // Monitor.addListener(() => {
 //   utools.showNotification(`插件已加载，当前值`)
 // })
+
+// utools.onPluginOut(() => {
+//   utools.showNotification(`preload`)
+// })
+// let xxx = 1
+// setInterval(() => {
+//   utools.showNotification(`preload ${xxx}`)
+//   xxx += 1
+// }, 5000)

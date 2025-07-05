@@ -61,7 +61,18 @@ export class PluginSettings {
 export class Monitor {
   private static checkInterval: number
   private static monitorInterval: NodeJS.Timeout | null = null
-  private static callbacks: Set<() => any> = new Set()
+  private static callbacks: Set<(force: boolean) => any> = new Set()
+  // static forceRunCallbacks: (() => void) | null = null
+  static forceRunCallbacks(force: boolean = true) {
+    this.callbacks.forEach((callback) => {
+      try {
+        callback(force)
+      }
+      catch (error) {
+        console.error('执行回调函数时发生错误:', error)
+      }
+    })
+  }
 
   static start(checkInterval?: number) {
     if (checkInterval !== void 0) {
@@ -71,20 +82,26 @@ export class Monitor {
       throw new Error('checkInterval 不能为空')
     }
     this.stop()
-    const runCallbacks = () => {
-      console.log('执行回调函数', this.callbacks)
-      this.callbacks.forEach((callback) => {
-        try {
-          callback()
-        }
-        catch (error) {
-          console.error('执行回调函数时发生错误:', error)
-        }
-      })
-    }
-    runCallbacks()
+    //   const runCallbacks = () => {
+    //     this.callbacks.forEach((callback) => {
+    //       try {
+    //         callback()
+    //       }
+    //       catch (error) {
+    //         console.error('执行回调函数时发生错误:', error)
+    //       }
+    //     })
+    //   }
+    //   runCallbacks()
+    //   this.monitorInterval = setInterval(
+    //     runCallbacks,
+    //     this.checkInterval,
+    //   )
+    //   this.forceRunCallbacks = runCallbacks
+    //   return runCallbacks
+    this.forceRunCallbacks(false)
     this.monitorInterval = setInterval(
-      runCallbacks,
+      () => this.forceRunCallbacks(false),
       this.checkInterval,
     )
   }
@@ -94,7 +111,7 @@ export class Monitor {
     this.monitorInterval = null
   }
 
-  static addListener(listener: () => any) {
+  static addListener(listener: typeof Monitor.callbacks extends Set<infer T> ? T : never) {
     this.callbacks.add(listener)
     this.start()
     return () => {
@@ -102,7 +119,7 @@ export class Monitor {
     }
   }
 
-  static removeListener(listener: () => any) {
+  static removeListener(listener: typeof Monitor.callbacks extends Set<infer T> ? T : never) {
     return this.callbacks.delete(listener)
   }
 }
