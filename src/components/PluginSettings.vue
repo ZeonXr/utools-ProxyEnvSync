@@ -27,7 +27,7 @@ const syncEnabled = customRef<boolean>((track, trigger) => {
     },
     set(value) {
       PluginSettings.set('syncEnabled', value)
-      Monitor.forceRunCallbacks?.()
+      Monitor.forceRunCallbacks()
       trigger()
     },
   }
