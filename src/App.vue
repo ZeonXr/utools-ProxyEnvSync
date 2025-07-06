@@ -4,13 +4,16 @@ import StatusCard from './components/StatusCard.vue'
 </script>
 
 <template>
-  <div class="flex flex-col gap-4 p-4">
+  <div class="flex-col flex gap-4 p-4">
     <StatusCard />
     <PluginSettings />
   </div>
 </template>
 
 <style>
+:root {
+  user-select: none;
+}
 html,
 body,
 #app {

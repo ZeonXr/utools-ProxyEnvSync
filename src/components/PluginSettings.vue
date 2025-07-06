@@ -90,7 +90,7 @@ function blockPress(e: KeyboardEvent) {
             type="number"
             :min="intervalRange.min"
             :max="intervalRange.max"
-            class="w-20 px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+            class="dark:text-gray-100 w-20 px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600"
             @keypress="blockPress"
           >
           <span class="text-gray-700 dark:text-gray-300">秒</span>

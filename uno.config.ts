@@ -1,5 +1,14 @@
 import { defineConfig } from 'unocss'
 
 export default defineConfig({
-  // ...UnoCSS options
+  // presets: [
+  //   presetAttributify({
+  //     prefix: 'un-',
+  //     prefixedOnly: true,
+  //   }),
+  // ],
+  // transformers: [
+  //   transformerDirectives(),
+  //   transformerVariantGroup(),
+  // ],
 })

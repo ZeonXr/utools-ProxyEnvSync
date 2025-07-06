@@ -19,7 +19,7 @@ function unmountApp() {
     app = null
   }
 }
-
+mountApp()
 utools.onPluginEnter(() => {
   mountApp()
 })
