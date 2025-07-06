@@ -15,7 +15,6 @@ export class PluginSettings {
   static get(key?: StorageKey) {
     if (isNotEmpty(key)) {
       const value = utools.dbStorage.getItem(key)
-      console.log(`获取设置: ${key} = ${value}`)
       if (isEmpty(value)) {
         return PluginSettings.set(key, Storage[key])
       }
