@@ -1,6 +1,12 @@
 <script setup lang="ts">
+import { useDark } from '@vueuse/core'
 import PluginSettings from './components/PluginSettings.vue'
 import StatusCard from './components/StatusCard.vue'
+
+useDark({
+  storageKey: null, // 禁用持久化
+  initialValue: 'auto', // 默认跟随系统
+})
 </script>
 
 <template>
