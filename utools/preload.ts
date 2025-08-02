@@ -1,43 +1,75 @@
-// https://www.u-tools.cn/docs/developer/docs.html
-import ProxyManager from './proxyManager'
+import type { ProxyEnv, ProxySettings } from './ProxyEnvManager'
+import { Monitor, PluginSettings } from './pluginController'
+import { getProxyEnv, getSystemProxy, setProxyEnv } from './ProxyEnvManager'
+import { jsonEqualObject } from './utils'
 
-const proxyManager = ProxyManager.getInstance()
+Monitor.start(PluginSettings.get('checkInterval'))
 
-// 启动代理监控
-proxyManager.startMonitoring()
+const onUpdateStatusRemoveCallbacks: Set<() => void> = new Set()
+utools.onPluginOut(() => {
+  onUpdateStatusRemoveCallbacks.forEach((removeCallback) => {
+    removeCallback()
+  })
+})
 
-// // 定义要暴露给渲染进程的 API
-// export const customApis = {
-//   // 获取当前系统代理设置
-//   getCurrentSettings: () => proxyManager.getCurrentSettings(),
+export function onUpdateStatus(callback: (args: { systemProxy: ProxySettings, env: ProxyEnv, forceUpdate: boolean }) => void) {
+  const removeListener = Monitor.addListener((force) => {
+    const systemProxy = getSystemProxy()
+    const env = getProxyEnv()
+    callback({ systemProxy, env, forceUpdate: force })
+  })
+  const removeCallback = () => {
+    removeListener()
+    onUpdateStatusRemoveCallbacks.delete(removeCallback)
+  }
 
-//   // 获取环境变量状态
-//   getEnvStatus: () => proxyManager.getEnvStatus(),
+  onUpdateStatusRemoveCallbacks.add(removeCallback)
 
-//   // 设置同步状态
-//   setSyncEnabled: (enabled: boolean) => proxyManager.setSyncEnabled(enabled),
+  return removeCallback
+}
 
-//   // 获取同步状态
-//   getSyncEnabled: () => proxyManager.getSyncEnabled(),
+let lastSystemProxy: ProxySettings | null = null
+function updateProxyEnv(systemProxy: ProxySettings) {
+  if (systemProxy.enabled && PluginSettings.get('syncEnabled')) {
+    const proxyUrl = `http://${systemProxy.host}:${systemProxy.port}`
+    setProxyEnv(proxyUrl)
+  }
+  else {
+    setProxyEnv(null)
+  }
+}
+const mainProcessStatusListener = onUpdateStatus(({ systemProxy, forceUpdate }) => {
+  if (!forceUpdate && jsonEqualObject(lastSystemProxy, systemProxy)) {
+    return
+  }
+  if (PluginSettings.get('notificationEnabled')) {
+    utools.showNotification(`代理状态已更新: ${systemProxy.enabled ? '启用' : '禁用'}\n地址: http://${systemProxy.host}:${systemProxy.port}`)
+  }
+  lastSystemProxy = systemProxy
+  if (systemProxy.enabled && PluginSettings.get('syncEnabled')) {
+    const proxyUrl = `http://${systemProxy.host}:${systemProxy.port}`
+    setProxyEnv(proxyUrl)
+  }
+  else {
+    setProxyEnv(null)
+  }
+  updateProxyEnv(systemProxy)
+})
 
-//   // 设置检查间隔
-//   setCheckInterval: (intervalMs: number) => proxyManager.setCheckInterval(intervalMs),
+utools.onPluginOut((processExit) => {
+  if (processExit) {
+    mainProcessStatusListener()
+    setProxyEnv(null)
+  }
+})
 
-//   // 获取检查间隔
-//   getCheckInterval: () => proxyManager.getCheckInterval(),
-
-//   // 设置通知状态
-//   setNotificationEnabled: (enabled: boolean) => proxyManager.setNotificationEnabled(enabled),
-
-//   // 获取通知状态
-//   getNotificationEnabled: () => proxyManager.getNotificationEnabled(),
-
-//   // 监听设置变化
-//   onSettingsChange: (callback: (settings: any) => void) => {
-//     proxyManager.onSettingsChange(callback)
-//     return () => proxyManager.removeSettingsChangeListener(callback)
-//   },
-// }
+const proxyManager = {
+  onUpdateStatus,
+  Monitor,
+  PluginSettings,
+  getSystemProxy,
+  updateProxyEnv,
+}
 
 window.proxyManager = proxyManager
 

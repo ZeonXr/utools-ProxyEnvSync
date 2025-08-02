@@ -12,9 +12,11 @@ export default defineConfig(({ command }) => {
     base: './',
     plugins: [vue(), UnoCSS(), utools({
       entry: [
-        { entry: 'utools/preload.ts',
+        {
+          entry: 'utools/preload.ts',
           // 是否忽略打包第三方依赖
-          mode: isBuild ? BuildMode.ExcludeDependencies : BuildMode.IncludeDependencies },
+          mode: isBuild ? BuildMode.ExcludeDependencies : BuildMode.IncludeDependencies,
+        },
       ],
       hmr: true,
     })],
