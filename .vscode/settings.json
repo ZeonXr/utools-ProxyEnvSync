@@ -1,5 +1,6 @@
 {
   // Disable the default formatter, use eslint instead
+  "editor.defaultFormatter": "rvest.vs-code-prettier-eslint",
   "prettier.enable": false,
   "editor.formatOnSave": false,
 
@@ -47,5 +48,8 @@
     "scss",
     "pcss",
     "postcss"
-  ]
+  ],
+  "[jsonc]": {
+    "editor.defaultFormatter": "vscode.json-language-features"
+  }
 }

@@ -4,8 +4,8 @@ export default antfu({
   formatters: true,
   unocss: true,
   vue: true,
-  rules: {
-    'no-debugger': 'off',
-    'no-console': 'off',
-  },
+  // rules: {
+  //   'no-debugger': 'off',
+  //   'no-console': 'off',
+  // },
 })

@@ -9,28 +9,27 @@
     "dev": "vite",
     "build": "vue-tsc && vite build && node ./scripts/build.js",
     "build:skip-typecheck": "vite build && node ./scripts/build.js",
-    "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "vue-tsc --noEmit",
     "lint": "eslint",
     "lint:fix": "eslint --fix"
   },
   "dependencies": {
     "@qc2168/vite-plugin-utools": "^1.7.0",
-    "@vueuse/core": "^13.5.0",
-    "vue": "^3.5.17"
+    "@vueuse/core": "^13.6.0",
+    "vue": "^3.5.18"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "^4.16.2",
-    "@types/node": "^20.19.4",
-    "@unocss/eslint-plugin": "66.1.0-beta.6",
-    "@vitejs/plugin-vue": "^5.2.4",
-    "eslint": "^9.30.1",
+    "@antfu/eslint-config": "^5.1.0",
+    "@types/node": "^20.19.9",
+    "@unocss/eslint-plugin": "^66.4.0",
+    "@vitejs/plugin-vue": "^6.0.1",
+    "eslint": "^9.32.0",
     "eslint-plugin-format": "^1.0.1",
     "typescript": "^5.8.3",
-    "unocss": "^66.3.3",
-    "utools-api-types": "^5.2.0",
-    "vite": "^6.3.5",
-    "vue-tsc": "^2.2.12"
+    "unocss": "^66.4.0",
+    "utools-api-types": "^7.2.0",
+    "vite": "^7.0.6",
+    "vue-tsc": "^3.0.5"
   },
   "env": {
     "VITE_DEV_SERVER_HOST": "127.0.0.1",
