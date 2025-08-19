@@ -63,7 +63,29 @@ export const setProxyEnv: (proxyUrl: string | null) => void = (() => {
     const begin = content.indexOf(PROXY_CONFIG_BEGIN)
     const end = content.indexOf(PROXY_CONFIG_END)
     if (begin !== -1 && end !== -1 && begin < end) {
-      content = content.slice(0, begin) + content.slice(end + PROXY_CONFIG_END.length)
+      // 查找配置块开始前的换行符位置
+      let beforeBegin = begin
+      while (beforeBegin > 0 && content[beforeBegin - 1] === '\n') {
+        beforeBegin--
+      }
+
+      // 查找配置块结束后的换行符位置
+      let afterEnd = end + PROXY_CONFIG_END.length
+      while (afterEnd < content.length && content[afterEnd] === '\n') {
+        afterEnd++
+      }
+
+      // 移除配置块及其前后的换行符，但保留一个换行符（如果原本就有的话）
+      const beforeContent = content.slice(0, beforeBegin)
+      const afterContent = content.slice(afterEnd)
+
+      // 如果移除后前面有内容且后面也有内容，确保它们之间有适当的分隔
+      if (beforeContent && afterContent && !beforeContent.endsWith('\n')) {
+        content = `${beforeContent}\n${afterContent}`
+      }
+      else {
+        content = beforeContent + afterContent
+      }
     }
     if (proxyUrl) {
       const proxyConfig = generateProxyConfig(proxyUrl)
