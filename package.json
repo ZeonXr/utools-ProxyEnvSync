@@ -1,7 +1,7 @@
 {
   "name": "proxy-env-sync",
   "type": "module",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "private": true,
   "description": "Synchronize system proxy settings with environment variables",
   "author": "ZeonXr",
