@@ -2,7 +2,6 @@ import { exec } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import fs from 'node:fs/promises'
 import os from 'node:os'
-import process from 'node:process'
 import { promisify } from 'node:util'
 
 const execAsync = promisify(exec)
@@ -17,7 +16,7 @@ const PROXY_CONFIG_BEGIN = '# BEGIN: ProxyEnvSync Configuration'
 const PROXY_CONFIG_END = '# END: ProxyEnvSync Configuration'
 
 function getConfigPath(): string {
-  const homeDir = process.env.HOME || process.env.USERPROFILE
+  const homeDir = utools.getPath('home')
   if (!homeDir) {
     throw new Error('Home directory not found')
   }
