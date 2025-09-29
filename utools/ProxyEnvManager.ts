@@ -1,7 +1,11 @@
-import { execSync } from 'node:child_process'
-import fs from 'node:fs'
+import { exec } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import fs from 'node:fs/promises'
 import os from 'node:os'
 import process from 'node:process'
+import { promisify } from 'node:util'
+
+const execAsync = promisify(exec)
 
 const platform = os.platform()
 
@@ -36,28 +40,35 @@ function generateProxyConfig(proxyUrl: string): string {
   return `${PROXY_CONFIG_BEGIN}\n${ENV_VARS.map(env => `export ${env}=${quote}${proxyUrl}${quote}`).join('\n')}\n${PROXY_CONFIG_END}`
 }
 
-export const setProxyEnv: (proxyUrl: string | null) => void = (() => {
-  function windows_setProxyEnv(proxyUrl: string | null) {
+export const setProxyEnv: (proxyUrl: string | null) => Promise<void> = (() => {
+  async function windows_setProxyEnv(proxyUrl: string | null) {
     if (proxyUrl) {
-      ENV_VARS.forEach((env) => {
-        execSync(`setx ${env} ${proxyUrl}`, { stdio: 'ignore' })
-      })
+      for (const env of ENV_VARS) {
+        try {
+          await execAsync(`setx ${env} ${proxyUrl}`)
+        }
+        catch (error) {
+          console.error(`Failed to set ${env}:`, error)
+        }
+      }
     }
     else {
-      ENV_VARS.forEach((env) => {
+      for (const env of ENV_VARS) {
         try {
-          execSync(`reg delete HKCU\\Environment /F /V ${env}`, { stdio: 'ignore' })
+          await execAsync(`reg delete HKCU\\Environment /F /V ${env}`)
         }
-        catch {}
-      })
+        catch {
+          // 未设置时 reg delete 会报错，忽略即可
+        }
+      }
     }
   }
 
-  function mac_setProxyEnv(proxyUrl: string | null) {
+  async function mac_setProxyEnv(proxyUrl: string | null) {
     const configPath = getConfigPath()
     let content = ''
-    if (fs.existsSync(configPath)) {
-      content = fs.readFileSync(configPath, 'utf-8')
+    if (existsSync(configPath)) {
+      content = await fs.readFile(configPath, 'utf-8')
     }
     // 移除旧配置
     const begin = content.indexOf(PROXY_CONFIG_BEGIN)
@@ -91,7 +102,7 @@ export const setProxyEnv: (proxyUrl: string | null) => void = (() => {
       const proxyConfig = generateProxyConfig(proxyUrl)
       content += `${(content.endsWith('\n') ? '' : '\n') + proxyConfig}\n`
     }
-    fs.writeFileSync(configPath, content, 'utf-8')
+    await fs.writeFile(configPath, content, 'utf-8')
   }
   switch (platform) {
     case 'win32':
@@ -103,7 +114,7 @@ export const setProxyEnv: (proxyUrl: string | null) => void = (() => {
   }
 })()
 
-export const getProxyEnv: () => ProxyEnv = (() => {
+export const getProxyEnv: () => Promise<ProxyEnv> = (() => {
   function parseProxyEnv(content: string): ProxyEnv {
     const begin = content.indexOf(PROXY_CONFIG_BEGIN)
     const end = content.indexOf(PROXY_CONFIG_END)
@@ -122,20 +133,18 @@ export const getProxyEnv: () => ProxyEnv = (() => {
     }, {} as ProxyEnv)
     return result
   }
-  function windows_getProxyEnv() {
+  async function windows_getProxyEnv(): Promise<ProxyEnv> {
     const result: ProxyEnv = {
       all_proxy: '',
       http_proxy: '',
       https_proxy: '',
     }
-    ENV_VARS.forEach((env) => {
+
+    for (const env of ENV_VARS) {
       try {
-        const output = execSync(`reg query HKCU\\Environment /v ${env}`, {
-          encoding: 'utf-8',
-          stdio: ['pipe', 'pipe', 'ignore'],
-        })
+        const { stdout } = await execAsync(`reg query HKCU\\Environment /v ${env}`)
         // 解析类似于：ENV_NAME    REG_SZ    value
-        const match = output.match(/REG_SZ\s+([^\r\n]+)/)
+        const match = stdout.match(/REG_SZ\s+([^\r\n]+)/)
         if (match) {
           result[env] = match[1].trim()
         }
@@ -144,18 +153,18 @@ export const getProxyEnv: () => ProxyEnv = (() => {
         // 未设置时reg query会报错，忽略即可
         result[env] = ''
       }
-    })
+    }
     return result
   }
-  function mac_getProxyEnv() {
+  async function mac_getProxyEnv(): Promise<ProxyEnv> {
     const configPath = getConfigPath()
-    if (!fs.existsSync(configPath)) {
+    if (!existsSync(configPath)) {
       return ENV_VARS.reduce((acc, env) => {
         acc[env] = ''
         return acc
       }, {} as ProxyEnv)
     }
-    const content = fs.readFileSync(configPath, 'utf-8')
+    const content = await fs.readFile(configPath, 'utf-8')
     return parseProxyEnv(content)
   }
   switch (platform) {
@@ -174,59 +183,67 @@ export interface ProxySettings {
   port: string
 }
 
-export const getSystemProxy: () => ProxySettings = (() => {
-  function windows_getSystemProxy(): ProxySettings {
-    const result: ProxySettings = {
-      enabled: false,
-      host: '',
-      port: '',
-    }
-    // 使用 powershell 获取代理设置
-    const command = 'powershell -Command "Get-ItemProperty -Path \'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings\' | Select-Object ProxyEnable,ProxyServer | ConvertTo-Json"'
-    const winStdout = execSync(command, { encoding: 'utf-8' })
-    const proxySettings = JSON.parse(winStdout)
-    result.enabled = proxySettings.ProxyEnable === 1
-    if (proxySettings.ProxyServer) {
-      const [proxyHost, proxyPort] = proxySettings.ProxyServer.split(':')
-      result.host = proxyHost
-      result.port = proxyPort
-    }
-    return result
-  }
-  function mac_getSystemProxy(): ProxySettings {
+export const getSystemProxy: () => Promise<ProxySettings> = (() => {
+  async function windows_getSystemProxy(): Promise<ProxySettings> {
     const result: ProxySettings = {
       enabled: false,
       host: '',
       port: '',
     }
     try {
-      const iface = execSync('route get default | grep interface')
-        .toString()
-        .match(/interface:\s+(\S+)/)?.[1]
+      // 使用 powershell 获取代理设置
+      const command = 'powershell -Command "Get-ItemProperty -Path \'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings\' | Select-Object ProxyEnable,ProxyServer | ConvertTo-Json"'
+      const { stdout } = await execAsync(command)
+      const proxySettings = JSON.parse(stdout)
+      result.enabled = proxySettings.ProxyEnable === 1
+      if (proxySettings.ProxyServer) {
+        const [proxyHost, proxyPort] = proxySettings.ProxyServer.split(':')
+        result.host = proxyHost
+        result.port = proxyPort
+      }
+    }
+    catch (error) {
+      console.error('Failed to get Windows system proxy:', error)
+    }
+    return result
+  }
+  async function mac_getSystemProxy(): Promise<ProxySettings> {
+    const result: ProxySettings = {
+      enabled: false,
+      host: '',
+      port: '',
+    }
+    try {
+      const { stdout: routeOutput } = await execAsync('route get default | grep interface')
+      const iface = routeOutput.match(/interface:\s+(\S+)/)?.[1]
       if (!iface) {
         throw new Error('获取默认接口失败')
       }
-      const portsInfo = execSync('networksetup -listallhardwareports').toString()
+
+      const { stdout: portsInfo } = await execAsync('networksetup -listallhardwareports')
       const serviceMatch = portsInfo
         .split(/\n{2,}/)
-        .find(block => block.includes(`Device: ${iface}`))
+        .find((block: string) => block.includes(`Device: ${iface}`))
         ?.match(/Hardware Port: (.+)/)
       if (!serviceMatch) {
         throw new Error('获取服务名失败')
       }
+
       const serviceName = serviceMatch[1].trim()
-      const proxyRaw = execSync(`networksetup -getwebproxy "${serviceName}"`).toString()
+      const { stdout: proxyRaw } = await execAsync(`networksetup -getwebproxy "${serviceName}"`)
       const proxyKeys = ['Enabled', 'Server', 'Port'] as const
-      const proxy = proxyRaw.split('\n').reduce((acc, line) => {
-        const [key, value] = line.split(':').map(s => s.trim())
+      const proxy = proxyRaw.split('\n').reduce((acc: Record<string, string>, line: string) => {
+        const [key, value] = line.split(':').map((s: string) => s.trim())
         if (key && value) {
-          acc[key as keyof typeof acc] = value
+          acc[key] = value
         }
         return acc
       }, {} as Record<(typeof proxyKeys)[number], string>)
+
       if (!proxyKeys.every(key => key in proxy)) {
         throw new Error('获取代理设置失败')
       }
+
       result.enabled = proxy.Enabled === 'Yes'
       if (proxy.Server && proxy.Port) {
         result.host = proxy.Server

@@ -27,7 +27,9 @@ const syncEnabled = customRef<boolean>((track, trigger) => {
     },
     set(value) {
       PluginSettings.set('syncEnabled', value)
-      Monitor.forceRunCallbacks()
+      Monitor.forceRunCallbacks().catch((error) => {
+        console.error('同步设置变更时执行回调失败:', error)
+      })
       trigger()
     },
   }

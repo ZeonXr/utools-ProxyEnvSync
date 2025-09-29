@@ -64,15 +64,17 @@ export class Monitor {
   private static checkInterval: number
   private static monitorInterval: NodeJS.Timeout | null = null
   private static callbacks: Set<MonitorCallback> = new Set()
-  static forceRunCallbacks(force: boolean = true) {
-    this.callbacks.forEach((callback) => {
+  static async forceRunCallbacks(force: boolean = true) {
+    const promises = Array.from(this.callbacks).map(async (callback) => {
       try {
-        callback(force)
+        console.log('执行回调函数:', callback)
+        await callback(force)
       }
       catch (error) {
         console.error('执行回调函数时发生错误:', error)
       }
     })
+    await Promise.all(promises)
   }
 
   static start(checkInterval?: number) {
@@ -83,9 +85,17 @@ export class Monitor {
       throw new Error('checkInterval 不能为空')
     }
     this.stop()
-    this.forceRunCallbacks(false)
+    // 立即执行一次，不等待结果以避免阻塞
+    this.forceRunCallbacks(false).catch((error) => {
+      console.error('初始回调执行失败:', error)
+    })
     this.monitorInterval = setInterval(
-      () => this.forceRunCallbacks(false),
+      () => {
+        // 定时执行，不等待结果以避免阻塞后续的定时器
+        this.forceRunCallbacks(false).catch((error) => {
+          console.error('定时回调执行失败:', error)
+        })
+      },
       this.checkInterval,
     )
   }
