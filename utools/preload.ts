@@ -1,9 +1,8 @@
+import type { Awaitable } from '@vueuse/core'
 import type { ProxyEnv, ProxySettings } from './ProxyEnvManager'
 import { Monitor, PluginSettings } from './pluginController'
 import { getProxyEnv, getSystemProxy, setProxyEnv } from './ProxyEnvManager'
 import { jsonEqualObject } from './utils'
-
-Monitor.start(PluginSettings.get('checkInterval'))
 
 const onUpdateStatusRemoveCallbacks: Set<() => void> = new Set()
 utools.onPluginOut(() => {
@@ -12,14 +11,15 @@ utools.onPluginOut(() => {
   })
 })
 
-export function onUpdateStatus(callback: (args: { systemProxy: ProxySettings, env: ProxyEnv, forceUpdate: boolean }) => void) {
-  const removeListener = Monitor.addListener(async (force) => {
+export function onUpdateStatus(callback: (args: { systemProxy: ProxySettings, env: ProxyEnv }) => Awaitable<void>) {
+  const removeListener = Monitor.addListener(async () => {
     try {
+      await Monitor.waitFinish
       const [systemProxy, env] = await Promise.all([
         getSystemProxy(),
         getProxyEnv(),
       ])
-      callback({ systemProxy, env, forceUpdate: force })
+      await callback({ systemProxy, env })
     }
     catch (error) {
       console.error('Failed to get proxy status:', error)
@@ -35,29 +35,27 @@ export function onUpdateStatus(callback: (args: { systemProxy: ProxySettings, en
   return removeCallback
 }
 
-let lastSystemProxy: ProxySettings | null = null
+let lastProxyUrl: string | null = null
 async function updateProxyEnv(systemProxy: ProxySettings) {
-  try {
-    if (systemProxy.enabled && PluginSettings.get('syncEnabled')) {
-      const proxyUrl = `http://${systemProxy.host}:${systemProxy.port}`
-      await setProxyEnv(proxyUrl)
-    }
-    else {
-      await setProxyEnv(null)
-    }
+  let proxyUrl = null
+  if (systemProxy.enabled && PluginSettings.get('syncEnabled')) {
+    proxyUrl = `http://${systemProxy.host}:${systemProxy.port}`
   }
-  catch (error) {
-    console.error('Failed to update proxy environment:', error)
-  }
-}
-const mainProcessStatusListener = onUpdateStatus(async ({ systemProxy, forceUpdate }) => {
-  if (!forceUpdate && jsonEqualObject(lastSystemProxy, systemProxy)) {
+  if (proxyUrl === lastProxyUrl) {
     return
   }
-  if (PluginSettings.get('notificationEnabled')) {
-    utools.showNotification(`代理状态已更新: ${systemProxy.enabled ? '启用' : '禁用'}\n地址: http://${systemProxy.host}:${systemProxy.port}`)
+  lastProxyUrl = proxyUrl
+  await setProxyEnv(proxyUrl)
+}
+
+let lastSystemProxy: ProxySettings | null = null
+const mainProcessStatusListener = onUpdateStatus(async ({ systemProxy }) => {
+  if (!jsonEqualObject(lastSystemProxy, systemProxy)) {
+    if (PluginSettings.get('notificationEnabled')) {
+      utools.showNotification(`代理状态已更新: ${systemProxy.enabled ? '启用' : '禁用'}\n地址: http://${systemProxy.host}:${systemProxy.port}`)
+    }
+    lastSystemProxy = systemProxy
   }
-  lastSystemProxy = systemProxy
   await updateProxyEnv(systemProxy)
 })
 
@@ -65,11 +63,11 @@ utools.onPluginOut((processExit) => {
   if (processExit) {
     mainProcessStatusListener()
     // 异步清理代理环境变量，不等待结果
-    setProxyEnv(null).catch((error) => {
-      console.error('Failed to clear proxy environment on exit:', error)
-    })
+    setProxyEnv(null)
   }
 })
+
+Monitor.start(PluginSettings.get('checkInterval'))
 
 const proxyManager = {
   onUpdateStatus,

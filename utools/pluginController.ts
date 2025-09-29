@@ -1,8 +1,9 @@
+import type { Awaitable } from '@vueuse/core'
 import type { Mutable, PrimitiveType } from './utils'
 import { getType, isEmpty, isNotEmpty } from './utils'
 
 // 定义清晰的回调函数类型
-type MonitorCallback = (force: boolean) => void | Promise<void>
+type MonitorCallback = () => Awaitable<void>
 
 const Storage = {
   checkInterval: 20000 as number,
@@ -64,17 +65,17 @@ export class Monitor {
   private static checkInterval: number
   private static monitorInterval: NodeJS.Timeout | null = null
   private static callbacks: Set<MonitorCallback> = new Set()
-  static async forceRunCallbacks(force: boolean = true) {
-    const promises = Array.from(this.callbacks).map(async (callback) => {
+  static waitFinish: Promise<any> | null = null
+
+  static async runCallbacks() {
+    for (const callback of this.callbacks) {
       try {
-        console.log('执行回调函数:', callback)
-        await callback(force)
+        await callback()
       }
       catch (error) {
-        console.error('执行回调函数时发生错误:', error)
+        console.error('Monitor callback failed:', error)
       }
-    })
-    await Promise.all(promises)
+    }
   }
 
   static start(checkInterval?: number) {
@@ -85,17 +86,9 @@ export class Monitor {
       throw new Error('checkInterval 不能为空')
     }
     this.stop()
-    // 立即执行一次，不等待结果以避免阻塞
-    this.forceRunCallbacks(false).catch((error) => {
-      console.error('初始回调执行失败:', error)
-    })
+    this.runCallbacks()
     this.monitorInterval = setInterval(
-      () => {
-        // 定时执行，不等待结果以避免阻塞后续的定时器
-        this.forceRunCallbacks(false).catch((error) => {
-          console.error('定时回调执行失败:', error)
-        })
-      },
+      () => this.runCallbacks(),
       this.checkInterval,
     )
   }
@@ -105,9 +98,13 @@ export class Monitor {
     this.monitorInterval = null
   }
 
+  static isRunning(): boolean {
+    return this.monitorInterval !== null
+  }
+
   static addListener(listener: MonitorCallback): () => void {
     this.callbacks.add(listener)
-    this.start()
+    this.runCallbacks()
     return () => {
       this.removeListener(listener)
     }

@@ -20,6 +20,9 @@ const notificationEnabled = customRef<boolean>((track, trigger) => {
 })
 
 const syncEnabled = customRef<boolean>((track, trigger) => {
+  const triggerRunCallbacks = useDebounceFn(() => {
+    Monitor.runCallbacks()
+  }, 500)
   return {
     get() {
       track()
@@ -27,9 +30,7 @@ const syncEnabled = customRef<boolean>((track, trigger) => {
     },
     set(value) {
       PluginSettings.set('syncEnabled', value)
-      Monitor.forceRunCallbacks().catch((error) => {
-        console.error('同步设置变更时执行回调失败:', error)
-      })
+      triggerRunCallbacks()
       trigger()
     },
   }
@@ -53,9 +54,7 @@ const checkInterval = customRef<number>((track, trigger) => {
       else if (value > intervalRange.max) {
         value = intervalRange.max
       }
-      let newValue = value * 1000
-      newValue = PluginSettings.set('checkInterval', newValue)
-      Monitor.start(newValue)
+      Monitor.start(PluginSettings.set('checkInterval', value * 1000))
       trigger()
     }, 1000),
   }
