@@ -65,7 +65,6 @@ export class Monitor {
   private static checkInterval: number
   private static monitorInterval: NodeJS.Timeout | null = null
   private static callbacks: Set<MonitorCallback> = new Set()
-  static waitFinish: Promise<any> | null = null
 
   static async runCallbacks() {
     for (const callback of this.callbacks) {

@@ -14,7 +14,6 @@ utools.onPluginOut(() => {
 export function onUpdateStatus(callback: (args: { systemProxy: ProxySettings, env: ProxyEnv }) => Awaitable<void>) {
   const removeListener = Monitor.addListener(async () => {
     try {
-      await Monitor.waitFinish
       const [systemProxy, env] = await Promise.all([
         getSystemProxy(),
         getProxyEnv(),
