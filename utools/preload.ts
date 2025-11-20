@@ -44,7 +44,14 @@ async function updateProxyEnv(systemProxy: ProxySettings) {
     return
   }
   lastProxyUrl = proxyUrl
-  await setProxyEnv(proxyUrl)
+  try {
+    await setProxyEnv(proxyUrl)
+  }
+  catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    console.error('Failed to sync proxy environment variables:', error)
+    utools.showNotification(`同步环境变量失败: ${errorMessage}`)
+  }
 }
 
 let lastSystemProxy: ProxySettings | null = null
@@ -62,7 +69,7 @@ utools.onPluginOut((processExit) => {
   if (processExit) {
     mainProcessStatusListener()
     // 异步清理代理环境变量，不等待结果
-    setProxyEnv(null)
+    setProxyEnv(null).catch(error => console.error('Failed to clear proxy env on exit:', error))
   }
 })
 

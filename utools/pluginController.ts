@@ -72,7 +72,7 @@ export class Monitor {
         await callback()
       }
       catch (error) {
-        console.error('Monitor callback failed:', error)
+        console.error(`[Monitor] Callback execution failed at ${new Date().toISOString()}:`, error)
       }
     }
   }

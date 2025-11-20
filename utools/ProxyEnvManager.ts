@@ -52,6 +52,7 @@ export const setProxyEnv: (proxyUrl: string | null) => Promise<void> = (() => {
         }
         catch (error) {
           console.error(`Failed to set ${env}:`, error)
+          throw error
         }
       }
     }
@@ -207,6 +208,7 @@ export const getSystemProxy: () => Promise<ProxySettings> = (() => {
     }
     catch (error) {
       console.error('Failed to get Windows system proxy:', error)
+      throw error
     }
     return result
   }
@@ -256,7 +258,7 @@ export const getSystemProxy: () => Promise<ProxySettings> = (() => {
     }
     catch (error) {
       console.error(error)
-      return result
+      throw error
     }
   }
   switch (platform) {
