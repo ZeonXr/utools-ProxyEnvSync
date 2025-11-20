@@ -2,6 +2,7 @@ import { exec } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import fs from 'node:fs/promises'
 import os from 'node:os'
+import process from 'node:process'
 import { promisify } from 'node:util'
 
 const execAsync = promisify(exec)
@@ -20,18 +21,21 @@ function getConfigPath(): string {
   if (!homeDir) {
     throw new Error('Home directory not found')
   }
-  let configPath: string
-  switch (platform) {
-    case 'win32':
-      configPath = `${homeDir}\\.bash_profile`
-      break
-    case 'darwin':
-      configPath = `${homeDir}/.zshrc`
-      break
-    default:
-      throw new Error('Unsupported platform')
+
+  if (platform === 'win32') {
+    return `${homeDir}\\.bash_profile`
   }
-  return configPath
+
+  if (platform === 'darwin') {
+    const shell = process.env.SHELL || ''
+    if (shell.endsWith('bash')) {
+      return `${homeDir}/.bash_profile`
+    }
+    // 默认为 .zshrc (macOS 默认 Shell)
+    return `${homeDir}/.zshrc`
+  }
+
+  throw new Error('Unsupported platform')
 }
 
 function generateProxyConfig(proxyUrl: string): string {
