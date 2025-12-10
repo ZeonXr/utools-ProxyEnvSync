@@ -17,8 +17,8 @@ const envStatus = ref({
 const { onUpdateStatus } = window.proxyManager
 
 const statusUpdater = onUpdateStatus(({ systemProxy, env }) => {
-  Object.assign(proxyStatus.value, systemProxy)
-  Object.assign(envStatus.value, env)
+  proxyStatus.value = systemProxy
+  envStatus.value = env
 })
 
 onUnmounted(() => {

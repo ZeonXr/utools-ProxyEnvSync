@@ -1,5 +1,9 @@
+import type { Awaitable } from '@vueuse/core'
 import type { Mutable, PrimitiveType } from './utils'
 import { getType, isEmpty, isNotEmpty } from './utils'
+
+// 定义清晰的回调函数类型
+type MonitorCallback = () => Awaitable<void>
 
 const Storage = {
   checkInterval: 20000 as number,
@@ -60,17 +64,17 @@ export class PluginSettings {
 export class Monitor {
   private static checkInterval: number
   private static monitorInterval: NodeJS.Timeout | null = null
-  private static callbacks: Set<(force: boolean) => any> = new Set()
-  // static forceRunCallbacks: (() => void) | null = null
-  static forceRunCallbacks(force: boolean = true) {
-    this.callbacks.forEach((callback) => {
+  private static callbacks: Set<MonitorCallback> = new Set()
+
+  static async runCallbacks() {
+    for (const callback of this.callbacks) {
       try {
-        callback(force)
+        await callback()
       }
       catch (error) {
-        console.error('执行回调函数时发生错误:', error)
+        console.error('Monitor callback failed:', error)
       }
-    })
+    }
   }
 
   static start(checkInterval?: number) {
@@ -81,26 +85,9 @@ export class Monitor {
       throw new Error('checkInterval 不能为空')
     }
     this.stop()
-    //   const runCallbacks = () => {
-    //     this.callbacks.forEach((callback) => {
-    //       try {
-    //         callback()
-    //       }
-    //       catch (error) {
-    //         console.error('执行回调函数时发生错误:', error)
-    //       }
-    //     })
-    //   }
-    //   runCallbacks()
-    //   this.monitorInterval = setInterval(
-    //     runCallbacks,
-    //     this.checkInterval,
-    //   )
-    //   this.forceRunCallbacks = runCallbacks
-    //   return runCallbacks
-    this.forceRunCallbacks(false)
+    this.runCallbacks()
     this.monitorInterval = setInterval(
-      () => this.forceRunCallbacks(false),
+      () => this.runCallbacks(),
       this.checkInterval,
     )
   }
@@ -110,15 +97,19 @@ export class Monitor {
     this.monitorInterval = null
   }
 
-  static addListener(listener: typeof Monitor.callbacks extends Set<infer T> ? T : never) {
+  static isRunning(): boolean {
+    return this.monitorInterval !== null
+  }
+
+  static addListener(listener: MonitorCallback): () => void {
     this.callbacks.add(listener)
-    this.start()
+    this.runCallbacks()
     return () => {
       this.removeListener(listener)
     }
   }
 
-  static removeListener(listener: typeof Monitor.callbacks extends Set<infer T> ? T : never) {
+  static removeListener(listener: MonitorCallback): boolean {
     return this.callbacks.delete(listener)
   }
 }
