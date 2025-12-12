@@ -1,21 +1,24 @@
 import type { Awaitable } from '@vueuse/core'
-import type { Mutable, PrimitiveType } from './utils'
+import type { PrimitiveType } from './utils'
 import { getType, isEmpty, isNotEmpty } from './utils'
 
 // 定义清晰的回调函数类型
 type MonitorCallback = () => Awaitable<void>
 
+// 默认设置存储结构
+// [key]: <[type]> [default value]
 const Storage = {
-  checkInterval: 20000 as number,
-  syncEnabled: false as boolean,
-  notificationEnabled: false as boolean,
+  checkInterval: <number> 20000,
+  syncEnabled: <boolean> false,
+  notificationEnabled: <boolean> false,
 } as const satisfies Record<string, PrimitiveType>
 
-type StorageKey = keyof typeof Storage
+type SettingSchema = typeof Storage
+type StorageKey = keyof SettingSchema
 
 export class PluginSettings {
-  static get(): Mutable<typeof Storage>
-  static get<T extends StorageKey>(key: T): typeof Storage[T]
+  static get(): SettingSchema
+  static get<T extends StorageKey>(key: T): SettingSchema[T]
   static get(key?: StorageKey) {
     if (isNotEmpty(key)) {
       const value = utools.dbStorage.getItem(key)
@@ -30,31 +33,35 @@ export class PluginSettings {
           key,
           PluginSettings.get(key as StorageKey),
         ]),
-      ) as Mutable<typeof Storage>
+      )
     }
   }
 
-  static set(keyOrObject: typeof Storage): Mutable<typeof Storage>
+  static set(object: Partial<SettingSchema>): SettingSchema
   static set<T extends StorageKey>(
-    keyOrObject: T,
-    value: typeof Storage[T]
-  ): typeof Storage[T]
+    key: T,
+    value: SettingSchema[T]
+  ): SettingSchema[T]
   static set(
-    keyOrObject: StorageKey | Record<StorageKey, PrimitiveType>,
+    keyOrObject: StorageKey | Partial<SettingSchema>,
     value?: PrimitiveType,
   ) {
     const typeOfKeyOrObject = getType(keyOrObject)
     switch (typeOfKeyOrObject) {
-      case 'string':
+      case 'string': {
+        const key = keyOrObject as StorageKey
         if (value !== undefined) {
-          utools.dbStorage.setItem(keyOrObject as StorageKey, value)
+          utools.dbStorage.setItem(key, value)
         }
-        return PluginSettings.get(keyOrObject as StorageKey)
-      case 'object':
-        Object.entries(keyOrObject).forEach(([key, value]) => {
-          utools.dbStorage.setItem(key as StorageKey, value)
+        return PluginSettings.get(key)
+      }
+      case 'object': {
+        const object = keyOrObject as Partial<SettingSchema>
+        Object.entries(object).forEach(([key, value]) => {
+          utools.dbStorage.setItem(key, value)
         })
         return PluginSettings.get()
+      }
       default:
         throw new Error(`不支持的类型: ${typeOfKeyOrObject}`)
     }
